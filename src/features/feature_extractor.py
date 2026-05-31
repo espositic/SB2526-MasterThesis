@@ -4,16 +4,20 @@ Pipeline di estrazione feature per ASVspoof 5.
 Flusso:
   1. Estrae i TAR dei protocolli e dell'audio (se non già fatto).
   2. Seleziona un sottoinsieme bilanciato (bonafide / spoof) con filtro per durata.
+     → Se esiste già un manifest per la stessa configurazione, lo ricarica
+       direttamente garantendo la riproducibilità dell'esperimento.
   3. Calcola Mel-Spettrogrammi con librosa.
   4. Salva gli array NumPy e aggiorna il CSV delle feature.
 """
 
 import csv
+import json
 import logging
 import os
 import tarfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -32,6 +36,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATASET_DIR = PROJECT_ROOT / "Dataset_full" / "ASVspoof5"
 EXPERIMENT_DIR = PROJECT_ROOT / "experiment" / "Dataset" / "ASVSpoof5Spectogram"
 FEATURES_CSV = PROJECT_ROOT / "experiment" / "Dataset" / "ASVSpoof5_features.csv"
+MANIFESTS_DIR = PROJECT_ROOT / "manifests"
 
 # Colonne del TSV di protocollo (spazio come separatore)
 TSV_COLUMNS = [
@@ -134,6 +139,124 @@ def ensure_audio_extracted(split: str, dataset_dir: Path = DATASET_DIR) -> Path:
 
 
 # ---------------------------------------------------------------------------
+# Manifest — riproducibilità degli esperimenti
+# ---------------------------------------------------------------------------
+
+def _manifest_path(split: str, n_per_class: int, seed: int) -> Path:
+    """Restituisce il percorso canonico del manifest per una data configurazione."""
+    return MANIFESTS_DIR / f"subset_{split}_n{n_per_class}_seed{seed}.csv"
+
+
+def save_manifest(
+    samples: "list[AudioSample]",
+    split: str,
+    n_per_class: int,
+    seed: int,
+    min_duration: float,
+    max_duration: float,
+) -> Path:
+    """
+    Salva la lista di campioni selezionati in un CSV leggero (solo nomi e label).
+    Il file viene scritto in manifests/ ed è destinato al commit su git per
+    garantire la riproducibilità dell'esperimento.
+
+    Formato colonne: file_name, label, audio_path
+    Header aggiuntivo (commento JSON nella prima riga) con i parametri usati.
+    """
+    MANIFESTS_DIR.mkdir(parents=True, exist_ok=True)
+    path = _manifest_path(split, n_per_class, seed)
+
+    params = {
+        "split": split,
+        "n_per_class": n_per_class,
+        "seed": seed,
+        "min_duration": min_duration,
+        "max_duration": max_duration,
+        "total_samples": len(samples),
+        "bonafide": sum(1 for s in samples if s.label == "bonafide"),
+        "spoof": sum(1 for s in samples if s.label == "spoof"),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    with path.open("w", newline="", encoding="utf-8") as f:
+        # Prima riga: metadati dell'esperimento come commento JSON
+        f.write(f"# {json.dumps(params)}\n")
+        writer = csv.writer(f)
+        writer.writerow(["file_name", "label", "audio_path"])
+        for s in samples:
+            writer.writerow([s.file_name, s.label, str(s.audio_path)])
+
+    logger.info(
+        "Manifest salvato: %s (%d campioni)",
+        path.relative_to(PROJECT_ROOT), len(samples),
+    )
+    return path
+
+
+def load_manifest(
+    split: str,
+    n_per_class: int,
+    seed: int,
+) -> "Optional[list[AudioSample]]":
+    """
+    Tenta di caricare il manifest per la configurazione richiesta.
+    Restituisce la lista di AudioSample se il file esiste e tutti i path
+    audio sono ancora validi su disco; None altrimenti.
+    """
+    path = _manifest_path(split, n_per_class, seed)
+    if not path.exists():
+        return None
+
+    logger.info("Manifest trovato: %s — carico campioni pre-selezionati...", path.name)
+    samples: list[AudioSample] = []
+    missing: list[str] = []
+
+    with path.open("r", encoding="utf-8") as f:
+        for line in f:
+            if line.startswith("#"):          # riga metadati JSON
+                try:
+                    params = json.loads(line[1:].strip())
+                    logger.info("Parametri manifest: %s", params)
+                except json.JSONDecodeError:
+                    pass
+                continue
+            break                             # fine intestazione
+
+        reader = csv.DictReader(f, fieldnames=["file_name", "label", "audio_path"])
+        next(reader, None)                   # salta riga header CSV
+        for row in reader:
+            audio_path = Path(row["audio_path"])
+            if not audio_path.exists():
+                missing.append(row["file_name"])
+                continue
+            samples.append(AudioSample(
+                file_name=row["file_name"],
+                label=row["label"],
+                audio_path=audio_path,
+            ))
+
+    if missing:
+        logger.warning(
+            "%d file del manifest non trovati su disco — "
+            "potrebbe essere necessario ri-estrarre i TAR audio. "
+            "Primo assente: %s",
+            len(missing), missing[0],
+        )
+
+    if not samples:
+        logger.warning("Manifest vuoto o tutti i file mancanti. Rigenero il subset.")
+        return None
+
+    logger.info(
+        "Subset caricato dal manifest: %d campioni (%d bonafide, %d spoof).",
+        len(samples),
+        sum(1 for s in samples if s.label == "bonafide"),
+        sum(1 for s in samples if s.label == "spoof"),
+    )
+    return samples
+
+
+# ---------------------------------------------------------------------------
 # Subsetting bilanciato
 # ---------------------------------------------------------------------------
 
@@ -158,6 +281,10 @@ def select_balanced_subset(
     Legge il TSV di protocollo, filtra per durata e restituisce un sottoinsieme
     bilanciato di n_per_class campioni per classe (bonafide e spoof).
 
+    Se esiste già un manifest per la stessa configurazione (split, n_per_class,
+    seed) lo carica direttamente, saltando la scansione delle durate e
+    garantendo la riproducibilità dell'esperimento.
+
     Args:
         split:          "train", "dev" o "eval".
         n_per_class:    Numero di campioni per classe.
@@ -169,6 +296,12 @@ def select_balanced_subset(
     Returns:
         Lista di AudioSample con percorso audio e label.
     """
+    # --- Tentativo di caricamento dal manifest (percorso veloce) ----------
+    cached = load_manifest(split, n_per_class, seed)
+    if cached is not None:
+        return cached
+    # ----------------------------------------------------------------------
+
     tsv_name = SPLIT_INFO[split]["tsv_name"]
     tsv_path = dataset_dir / tsv_name
 
@@ -279,6 +412,17 @@ def select_balanced_subset(
         len(buckets["spoof"]),
         scanned,
     )
+
+    # Salva il manifest per garantire la riproducibilità dei run futuri
+    save_manifest(
+        samples=samples,
+        split=split,
+        n_per_class=n_per_class,
+        seed=seed,
+        min_duration=min_duration,
+        max_duration=max_duration,
+    )
+
     return samples
 
 

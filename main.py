@@ -5,6 +5,8 @@ from src.features.feature_extractor import (
     AudioFeatureExtractor,
     ensure_audio_extracted,
     ensure_protocols_extracted,
+    load_manifest,
+    save_manifest,
     select_balanced_subset,
 )
 

@@ -1,8 +1,11 @@
 # Dataset
 Dataset_full/
 
-# Feature estratte
+# Feature estratte (binari pesanti — non committare)
 experiment/
+
+# Manifest dei campioni selezionati (committare per riproducibilità)
+# manifests/ è INCLUSO nel repo — NON aggiungere qui
 
 # File di task per Claude
 *.md.txt
