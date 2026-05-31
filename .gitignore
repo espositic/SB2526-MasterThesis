@@ -1,0 +1,33 @@
+# Dataset
+Dataset_full/
+
+# Feature estratte
+experiment/
+
+# File di task per Claude
+*.md.txt
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.user
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
