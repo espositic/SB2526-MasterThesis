@@ -1,11 +1,14 @@
-# Dataset
+# Dataset grezzi e artefatti degli esperimenti (pesanti — non committare)
+data/
+artifacts/
+# Vecchie cartelle del progetto a script
 Dataset_full/
-
-# Feature estratte (binari pesanti — non committare)
 experiment/
 
-# Manifest dei campioni selezionati (committare per riproducibilità)
-# manifests/ è INCLUSO nel repo — NON aggiungere qui
+# manifests/ è INCLUSO nel repo per la riproducibilità — NON aggiungerlo qui
+
+# Notebook
+.ipynb_checkpoints/
 
 # File di task per Claude
 *.md.txt

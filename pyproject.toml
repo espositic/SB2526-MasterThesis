@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "thesis"
+version = "0.1.0"
+description = "Esperimenti di anti-spoofing vocale (tesi magistrale SB 25/26)"
+requires-python = ">=3.10"
+dependencies = [
+    "huggingface_hub>=1.0",
+    "librosa",
+    "soundfile",
+    "numpy",
+    "pandas",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+notebook = ["jupyter", "matplotlib"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
