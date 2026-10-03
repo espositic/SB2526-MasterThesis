@@ -1,0 +1,31 @@
+{
+    "name":  "lcnn_lstm_specaug_oc_asvspoof5",
+    "model_type":  "lcnn",
+    "device":  "cpu",
+    "num_threads":  0,
+    "train_manifest":  "asvspoof5_train_n5000_seed42_dur1-15.csv",
+    "dev_manifest":  "asvspoof5_dev_n2500_seed42_dur1-15.csv",
+    "eval_manifest":  "asvspoof5_eval_n5000_seed42_dur1-15.csv",
+    "mel_tag":  "mel_sr16000_m128_fft1024_hop512",
+    "n_frames":  128,
+    "batch_size":  64,
+    "accum_steps":  1,
+    "lr":  0.0003,
+    "weight_decay":  0.0001,
+    "epochs":  30,
+    "patience":  7,
+    "warmup_ratio":  0.05,
+    "focal_gamma":  0.0,
+    "focal_alpha":  [
+                        0.5,
+                        0.5
+                    ],
+    "num_workers":  2,
+    "model":  {
+                  "n_mels":  128,
+                  "dropout":  0.75,
+                  "pooling":  "lstm_attn",
+                  "loss":  "ocsoftmax",
+                  "specaug":  true
+              }
+}

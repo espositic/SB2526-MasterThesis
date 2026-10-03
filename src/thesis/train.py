@@ -1,8 +1,10 @@
 """
-Training e valutazione di un detector su forma d'onda (per ora XLSR-MamBo).
+Training e valutazione dei detector: XLSR-MamBo su forma d'onda (GPU) e
+LCNN sui Mel-spettrogrammi già estratti (anche solo CPU).
 
 Entry point unico, pensato per girare in background senza Jupyter:
     python -m thesis.train --config configs/mambo_asvspoof5.json --seed 1
+    python -m thesis.train --config configs/lcnn_asvspoof5.json --seed 1 2 3
 
 Protocollo: train sul manifest di train, scelta dell'epoca migliore SOLO sul
 dev (EER), test una volta sola sull'eval con il modello migliore.
@@ -34,19 +36,31 @@ from tqdm import tqdm
 from thesis import metrics
 from thesis.config import ARTIFACTS_ROOT, MANIFESTS_DIR, PROJECT_ROOT
 from thesis.datasets import ASVspoof5
-from thesis.models import MamBoConfig, XLSRMamBo, count_parameters
+from thesis.features import MelDataset
+from thesis.models import LCNN, LCNNConfig, MamBoConfig, XLSRMamBo, count_parameters
 from thesis.waveform import WaveformDataset
 
 logger = logging.getLogger(__name__)
 
 
+MODELS = {  # model_type → (classe della config, classe del modello, ingresso)
+    "mambo": (MamBoConfig, XLSRMamBo, "waveform"),
+    "lcnn": (LCNNConfig, LCNN, "mel"),
+}
+
+
 @dataclass
 class TrainConfig:
     name: str = "mambo_asvspoof5"
+    model_type: str = "mambo"
+    device: str = "cuda"             # "cpu" per i PC senza GPU
+    num_threads: int = 0             # thread CPU di PyTorch (0 = default)
     train_manifest: str = "asvspoof5_train_n5000_seed42_dur1-15.csv"
     dev_manifest: str = "asvspoof5_dev_n2500_seed42_dur1-15.csv"
     eval_manifest: str = "asvspoof5_eval_n5000_seed42_dur1-15.csv"
-    n_samples: int = 66_800          # 4.175 s a 16 kHz, come nel paper
+    n_samples: int = 66_800          # forma d'onda: 4.175 s a 16 kHz, come nel paper MamBo
+    n_frames: int = 128              # Mel: 128 frame × 32 ms ≈ 4.1 s, stessa durata
+    mel_tag: str = "mel_sr16000_m128_fft1024_hop512"
     batch_size: int = 8
     accum_steps: int = 4             # batch effettivo 32, come nel paper
     lr: float = 1e-5
@@ -58,12 +72,14 @@ class TrainConfig:
     focal_alpha: tuple = (0.5, 0.5)  # [bonafide, spoof]: i nostri subset sono bilanciati
     num_workers: int = 4
     subset_frac: float = 1.0         # < 1 solo per lo smoke test
-    model: MamBoConfig = field(default_factory=MamBoConfig)
+    model: object = field(default_factory=MamBoConfig)
 
     @classmethod
     def from_json(cls, path) -> "TrainConfig":
         raw = json.loads(Path(path).read_text(encoding="utf-8"))
-        model = MamBoConfig(**raw.pop("model", {}))
+        model_type = raw.get("model_type", "mambo")
+        assert model_type in MODELS, f"model_type sconosciuto: {model_type}"
+        model = MODELS[model_type][0](**raw.pop("model", {}))
         unknown = set(raw) - set(cls.__dataclass_fields__)
         assert not unknown, f"chiavi sconosciute nella config: {unknown}"
         if "focal_alpha" in raw:
@@ -106,15 +122,21 @@ def save_atomic(obj, path: Path) -> None:
     os.replace(tmp, path)
 
 
-def load_split(ds: ASVspoof5, split: str, manifest: str, frac: float, seed: int) -> pd.DataFrame:
+def load_split(ds: ASVspoof5, split: str, manifest: str, frac: float, seed: int,
+               check_audio: bool = True) -> pd.DataFrame:
     """Manifest + metadati del protocollo (attacco, codec) per l'analisi per gruppo."""
-    subset = ds.load_manifest(MANIFESTS_DIR / manifest)
+    subset = ds.load_manifest(MANIFESTS_DIR / manifest, check_audio=check_audio)
     if frac < 1:
         subset = subset.groupby("label", group_keys=False).sample(frac=frac, random_state=seed)
     meta = ds.load_protocol(split)[["file_name", "attack_label", "codec"]]
     subset = subset.merge(meta, on="file_name", how="left", validate="one_to_one")
     assert subset["attack_label"].notna().all(), f"file del manifest {manifest} assenti dal protocollo"
     return subset.reset_index(drop=True)
+
+
+def autocast(device: torch.device):
+    """BF16 solo su GPU; su CPU si resta in float32."""
+    return torch.autocast(device.type, dtype=torch.bfloat16, enabled=device.type == "cuda")
 
 
 @torch.no_grad()
@@ -124,7 +146,7 @@ def predict(model, loader, device) -> tuple[np.ndarray, float]:
     scores, loss_sum, n = [], 0.0, 0
     for wave, label in tqdm(loader, desc="valutazione", leave=False):
         wave, label = wave.to(device, non_blocking=True), label.to(device)
-        with torch.autocast("cuda", dtype=torch.bfloat16):
+        with autocast(device):
             logits = model(wave)
         logits = logits.float()
         loss_sum += F.cross_entropy(logits, label, reduction="sum").item()
@@ -157,24 +179,32 @@ def run(cfg: TrainConfig, seed: int) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     set_seed(seed)
-    device = torch.device("cuda")
+    device = torch.device(cfg.device)
+    assert device.type != "cuda" or torch.cuda.is_available(), "config con device=cuda ma GPU non disponibile"
+    if cfg.num_threads > 0:
+        torch.set_num_threads(cfg.num_threads)
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
 
+    _, model_cls, input_kind = MODELS[cfg.model_type]
     ds = ASVspoof5()
     data = {
-        "train": load_split(ds, "train", cfg.train_manifest, cfg.subset_frac, seed),
-        "dev": load_split(ds, "dev", cfg.dev_manifest, cfg.subset_frac, seed),
-        "eval": load_split(ds, "eval", cfg.eval_manifest, cfg.subset_frac, seed),
+        split: load_split(ds, split, manifest, cfg.subset_frac, seed, check_audio=input_kind == "waveform")
+        for split, manifest in (("train", cfg.train_manifest), ("dev", cfg.dev_manifest), ("eval", cfg.eval_manifest))
     }
-    loader_args = dict(num_workers=cfg.num_workers, pin_memory=True,
+    if input_kind == "waveform":
+        make_ds = lambda subset: WaveformDataset(ds, subset, cfg.n_samples)
+    else:
+        feat_dir = ARTIFACTS_ROOT / "features" / ds.name / cfg.mel_tag
+        make_ds = lambda subset: MelDataset(feat_dir, subset, cfg.n_frames)
+    loader_args = dict(num_workers=cfg.num_workers, pin_memory=device.type == "cuda",
                        persistent_workers=cfg.num_workers > 0)
-    train_loader = DataLoader(WaveformDataset(ds, data["train"], cfg.n_samples), batch_size=cfg.batch_size,
+    train_loader = DataLoader(make_ds(data["train"]), batch_size=cfg.batch_size,
                               shuffle=True, drop_last=True, **loader_args)
-    eval_loaders = {s: DataLoader(WaveformDataset(ds, data[s], cfg.n_samples), batch_size=2 * cfg.batch_size,
+    eval_loaders = {s: DataLoader(make_ds(data[s]), batch_size=2 * cfg.batch_size,
                                   shuffle=False, **loader_args) for s in ("dev", "eval")}
 
-    model = XLSRMamBo(cfg.model).to(device)
+    model = model_cls(cfg.model).to(device)
     n_params = count_parameters(model)
     logger.info("Parametri: %s", n_params)
 
@@ -203,7 +233,8 @@ def run(cfg: TrainConfig, seed: int) -> dict:
         best_eer, best_epoch, waited = ckpt["best_eer"], ckpt["best_epoch"], ckpt["waited"]
         start_epoch = ckpt["epoch"] + 1
         torch.set_rng_state(ckpt["rng_cpu"])
-        torch.cuda.set_rng_state(ckpt["rng_cuda"])
+        if ckpt["rng_cuda"] is not None and device.type == "cuda":
+            torch.cuda.set_rng_state(ckpt["rng_cuda"])
         # Le righe di log.csv oltre l'ultima epoca salvata appartengono all'epoca interrotta
         if log_path.exists():
             log = pd.read_csv(log_path)
@@ -214,7 +245,9 @@ def run(cfg: TrainConfig, seed: int) -> dict:
     elif log_path.exists():
         log_path.unlink()  # log di un tentativo interrotto prima della fine della prima epoca
 
-    torch.cuda.reset_peak_memory_stats()
+    on_gpu = device.type == "cuda"
+    if on_gpu:
+        torch.cuda.reset_peak_memory_stats()
     stop = waited >= cfg.patience
     for epoch in range(start_epoch, cfg.epochs + 1):
         if stop:
@@ -225,9 +258,11 @@ def run(cfg: TrainConfig, seed: int) -> dict:
         batches = tqdm(train_loader, desc=f"epoca {epoch}", leave=False)
         for i, (wave, label) in enumerate(batches, 1):
             wave, label = wave.to(device, non_blocking=True), label.to(device)
-            with torch.autocast("cuda", dtype=torch.bfloat16):
+            with autocast(device):
                 logits = model(wave)
-            loss = focal_loss(logits, label, cfg.focal_gamma, cfg.focal_alpha)
+            loss = model.loss_fn(logits, label) if hasattr(model, "loss_fn") else None
+            if loss is None:  # loss di default: focal (con gamma=0 è la cross-entropy pesata)
+                loss = focal_loss(logits, label, cfg.focal_gamma, cfg.focal_alpha)
             assert torch.isfinite(loss), f"loss non finita all'epoca {epoch}, batch {i}"
             (loss / cfg.accum_steps).backward()
             if i % cfg.accum_steps == 0:
@@ -246,7 +281,7 @@ def run(cfg: TrainConfig, seed: int) -> dict:
         row = {"epoca": epoch, "train_loss": loss_sum / n_batches, "dev_loss": dev_loss, "dev_eer": dev_eer,
                "lr": scheduler.get_last_lr()[0], "sec_train": round(train_time),
                "sec_totale": round(time.time() - t0),
-               "gpu_max_gb": round(torch.cuda.max_memory_allocated() / 2**30, 2)}
+               "gpu_max_gb": round(torch.cuda.max_memory_allocated() / 2**30, 2) if on_gpu else 0.0}
         pd.DataFrame([row]).to_csv(log_path, mode="a", header=not log_path.exists(), index=False)
         logger.info("Epoca %d: %s", epoch, row)
 
@@ -262,7 +297,7 @@ def run(cfg: TrainConfig, seed: int) -> dict:
         save_atomic({
             "epoch": epoch, "model": model.state_dict(), "optimizer": optimizer.state_dict(),
             "scheduler": scheduler.state_dict(), "best_eer": best_eer, "best_epoch": best_epoch,
-            "waited": waited, "rng_cpu": torch.get_rng_state(), "rng_cuda": torch.cuda.get_rng_state(),
+            "waited": waited, "rng_cpu": torch.get_rng_state(), "rng_cuda": torch.cuda.get_rng_state() if on_gpu else None,
         }, ckpt_path)
 
     # Valutazione finale con il modello scelto sul dev

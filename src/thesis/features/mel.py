@@ -21,6 +21,8 @@ from typing import Optional
 import librosa
 import numpy as np
 import pandas as pd
+import torch
+from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from thesis.config import ARTIFACTS_ROOT
@@ -53,6 +55,30 @@ class MelConfig:
 
 def features_dir(dataset: BaseDataset, config: MelConfig) -> Path:
     return ARTIFACTS_ROOT / "features" / dataset.name / config.tag
+
+
+class MelDataset(Dataset):
+    """
+    Dataset PyTorch sugli spettrogrammi già estratti (non serve l'audio).
+    Ogni spettrogramma viene portato a `n_frames` come per la forma d'onda:
+    primi n_frames se è più lungo, ripetuto in loop se è più corto.
+    """
+
+    def __init__(self, feat_dir: Path, subset: pd.DataFrame, n_frames: int):
+        self.paths = [str(feat_dir / f"{name}.npy") for name in subset["file_name"]]
+        missing = [p for p in self.paths if not os.path.exists(p)]
+        assert not missing, f"{len(missing)} spettrogrammi mancanti in {feat_dir} (primo: {missing[0]})"
+        self.labels = subset["label"].map(LABEL_TO_INT).to_numpy()
+        self.n_frames = n_frames
+
+    def __len__(self):
+        return len(self.paths)
+
+    def __getitem__(self, i):
+        mel = np.load(self.paths[i])
+        if mel.shape[1] < self.n_frames:
+            mel = np.tile(mel, (1, -(-self.n_frames // mel.shape[1])))
+        return torch.from_numpy(mel[None, :, :self.n_frames].copy()), int(self.labels[i])
 
 
 def _process_one(args: tuple[MelConfig, Path, Path]) -> tuple[Optional[int], Optional[str]]:

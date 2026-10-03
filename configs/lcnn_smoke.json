@@ -1,0 +1,16 @@
+{
+  "name": "lcnn_smoke",
+  "model_type": "lcnn",
+  "device": "cpu",
+  "num_threads": 4,
+  "subset_frac": 0.1,
+  "batch_size": 64,
+  "accum_steps": 1,
+  "lr": 3e-4,
+  "weight_decay": 1e-4,
+  "epochs": 2,
+  "patience": 2,
+  "focal_gamma": 0.0,
+  "num_workers": 2,
+  "model": {}
+}

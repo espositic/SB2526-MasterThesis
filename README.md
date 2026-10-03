@@ -39,6 +39,19 @@ Risultati in `artifacts/runs/<nome>/seed<k>/` (config, log per epoca, punteggi,
 `metrics.json`); i seed già completati vengono saltati. Prima di un training
 lungo conviene lanciare `configs/mambo_smoke.json` (pochi file, 2 epoche).
 
+Configurazioni disponibili:
+
+| config | modello | ingresso | hardware |
+|---|---|---|---|
+| `mambo_asvspoof5` | XLSR-MamBo (MamBo-3-Hydra-N3) | forma d'onda | GPU ≥ 8 GB |
+| `lcnn_asvspoof5` | LCNN, pooling medio, cross-entropy | Mel | CPU |
+| `lcnn_lstm_asvspoof5` | + BiLSTM e attention pooling | Mel | CPU |
+| `lcnn_lstm_specaug_asvspoof5` | + SpecAugment in training | Mel | CPU |
+| `lcnn_lstm_specaug_oc_asvspoof5` | + OC-Softmax | Mel | CPU |
+
+Le LCNN non leggono l'audio: servono solo le feature Mel del notebook 01
+(`artifacts/features/asvspoof5/<tag>/`) e i TSV di protocollo in `data/asvspoof5/`.
+
 Su Colab la prima cella di ogni notebook clona il repo e installa tutto.
 Le radici di dati e artefatti si cambiano con `THESIS_DATA_ROOT` e `THESIS_ARTIFACTS_ROOT`.
 

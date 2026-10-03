@@ -177,17 +177,19 @@ class BaseDataset(ABC):
             subset[MANIFEST_COLUMNS].to_csv(f, index=False)
         logger.info("Manifest salvato: %s (%d campioni)", path.name, len(subset))
 
-    def load_manifest(self, path: Path) -> pd.DataFrame:
+    def load_manifest(self, path: Path, check_audio: bool = True) -> pd.DataFrame:
         """
         Carica un manifest e verifica che tutti i file audio esistano.
         Un manifest caricato solo in parte darebbe un esperimento diverso da
         quello registrato, quindi in quel caso si solleva un errore.
+        check_audio=False quando si usano solo feature già estratte (es. su un
+        altro PC senza l'audio): il controllo si sposta sui file delle feature.
         """
         params = read_manifest_params(path)
         logger.info("Manifest trovato: %s — %s", path.name, params)
         subset = pd.read_csv(path, skiprows=1 if params else 0)
 
-        missing = [p for p in subset["audio_path"] if not self.abs_path(p).exists()]
+        missing = [p for p in subset["audio_path"] if check_audio and not self.abs_path(p).exists()]
         if missing:
             raise FileNotFoundError(
                 f"{len(missing)}/{len(subset)} file del manifest {path.name} non trovati "
