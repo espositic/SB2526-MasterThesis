@@ -1,0 +1,9 @@
+{
+  "name": "mambo_smoke",
+  "subset_frac": 0.04,
+  "epochs": 2,
+  "patience": 2,
+  "batch_size": 8,
+  "accum_steps": 4,
+  "num_workers": 4
+}

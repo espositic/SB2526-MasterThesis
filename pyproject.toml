@@ -14,6 +14,7 @@ dependencies = [
     "numpy",
     "pandas",
     "tqdm",
+    "transformers",  # XLS-R; torch va installato a parte con CUDA (vedi README)
 ]
 
 [project.optional-dependencies]
