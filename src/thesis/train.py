@@ -9,7 +9,8 @@ dev (EER), test una volta sola sull'eval con il modello migliore.
 Tutto finisce in ARTIFACTS_ROOT/runs/<nome>/seed<k>/:
   config.json, log.csv (una riga per epoca), model_best.pt,
   scores_dev.csv, scores_eval.csv, metrics.json (scritto per ultimo).
-Un seed con metrics.json già presente viene saltato.
+Un seed con metrics.json già presente viene saltato; un seed interrotto riparte
+dall'ultima epoca completata grazie a checkpoint_last.pt (cancellato a fine seed).
 """
 
 import argparse
@@ -98,6 +99,13 @@ def git_commit() -> str:
         return "sconosciuto"
 
 
+def save_atomic(obj, path: Path) -> None:
+    """Salva su un file temporaneo e poi rinomina: un'interruzione non lascia file a metà."""
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    torch.save(obj, tmp)
+    os.replace(tmp, path)
+
+
 def load_split(ds: ASVspoof5, split: str, manifest: str, frac: float, seed: int) -> pd.DataFrame:
     """Manifest + metadati del protocollo (attacco, codec) per l'analisi per gruppo."""
     subset = ds.load_manifest(MANIFESTS_DIR / manifest)
@@ -184,9 +192,33 @@ def run(cfg: TrainConfig, seed: int) -> dict:
     }, indent=2), encoding="utf-8")
 
     log_path = out_dir / "log.csv"
-    best_eer, best_epoch, waited = float("inf"), 0, 0
+    ckpt_path = out_dir / "checkpoint_last.pt"
+    best_eer, best_epoch, waited, start_epoch = float("inf"), 0, 0, 1
+    if ckpt_path.exists():
+        # Ripresa dopo un'interruzione: si riparte dall'epoca successiva all'ultima completata
+        ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)  # in RAM: in GPU non ci sta
+        model.load_state_dict(ckpt["model"])
+        optimizer.load_state_dict(ckpt["optimizer"])
+        scheduler.load_state_dict(ckpt["scheduler"])
+        best_eer, best_epoch, waited = ckpt["best_eer"], ckpt["best_epoch"], ckpt["waited"]
+        start_epoch = ckpt["epoch"] + 1
+        torch.set_rng_state(ckpt["rng_cpu"])
+        torch.cuda.set_rng_state(ckpt["rng_cuda"])
+        # Le righe di log.csv oltre l'ultima epoca salvata appartengono all'epoca interrotta
+        if log_path.exists():
+            log = pd.read_csv(log_path)
+            log[log["epoca"] <= ckpt["epoch"]].to_csv(log_path, index=False)
+        logger.info("Ripresa dal checkpoint: epoca %d completata, migliore %d (EER dev %.4f)",
+                    ckpt["epoch"], best_epoch, best_eer)
+        del ckpt
+    elif log_path.exists():
+        log_path.unlink()  # log di un tentativo interrotto prima della fine della prima epoca
+
     torch.cuda.reset_peak_memory_stats()
-    for epoch in range(1, cfg.epochs + 1):
+    stop = waited >= cfg.patience
+    for epoch in range(start_epoch, cfg.epochs + 1):
+        if stop:
+            break
         model.train()
         t0, loss_sum, n_batches = time.time(), 0.0, 0
         optimizer.zero_grad(set_to_none=True)
@@ -220,12 +252,18 @@ def run(cfg: TrainConfig, seed: int) -> dict:
 
         if dev_eer < best_eer:
             best_eer, best_epoch, waited = dev_eer, epoch, 0
-            torch.save(model.state_dict(), out_dir / "model_best.pt")
+            save_atomic(model.state_dict(), out_dir / "model_best.pt")
         else:
             waited += 1
             if waited >= cfg.patience:
                 logger.info("Early stopping all'epoca %d (migliore: %d)", epoch, best_epoch)
-                break
+                stop = True
+
+        save_atomic({
+            "epoch": epoch, "model": model.state_dict(), "optimizer": optimizer.state_dict(),
+            "scheduler": scheduler.state_dict(), "best_eer": best_eer, "best_epoch": best_epoch,
+            "waited": waited, "rng_cpu": torch.get_rng_state(), "rng_cuda": torch.cuda.get_rng_state(),
+        }, ckpt_path)
 
     # Valutazione finale con il modello scelto sul dev
     model.load_state_dict(torch.load(out_dir / "model_best.pt", map_location=device))
@@ -238,6 +276,7 @@ def run(cfg: TrainConfig, seed: int) -> dict:
     tmp = out_dir / "metrics.json.tmp"
     tmp.write_text(json.dumps(results, indent=2), encoding="utf-8")
     os.replace(tmp, out_dir / "metrics.json")
+    ckpt_path.unlink()  # serve solo per riprendere un seed interrotto (~4 GB)
     logger.info("Seed %d: dev EER %.4f, eval EER %.4f", seed, results["dev"]["eer"], results["eval"]["eer"])
     return results
 
