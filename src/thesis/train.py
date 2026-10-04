@@ -39,7 +39,7 @@ from thesis.augment import RawBoostConfig
 from thesis.config import ARTIFACTS_ROOT, MANIFESTS_DIR, PROJECT_ROOT
 from thesis.datasets import ASVspoof5
 from thesis.features import MelDataset
-from thesis.models import LCNN, LCNNConfig, MamBoConfig, Nes2NetConfig, WavLMNes2Net, XLSRMamBo, count_parameters
+from thesis.models import LCNN, AASISTConfig, LCNNConfig, XLSRAASIST, MamBoConfig, Nes2NetConfig, WavLMNes2Net, XLSRMamBo, count_parameters
 from thesis.waveform import WaveformDataset
 
 logger = logging.getLogger(__name__)
@@ -49,6 +49,7 @@ MODELS = {  # model_type → (classe della config, classe del modello, ingresso)
     "mambo": (MamBoConfig, XLSRMamBo, "waveform"),
     "lcnn": (LCNNConfig, LCNN, "mel"),
     "nes2net": (Nes2NetConfig, WavLMNes2Net, "waveform"),
+    "aasist": (AASISTConfig, XLSRAASIST, "waveform"),
 }
 
 
