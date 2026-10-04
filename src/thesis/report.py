@@ -203,6 +203,43 @@ def calibra(name: str, seeds: list[int]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def fondi(names: list[str], seed: int, out_name: str) -> dict:
+    """
+    Fusione a livello di punteggio dei run `names` (stesso seed): pesi e offset
+    stimati con regressione logistica SOLO sul dev, poi applicati all'eval.
+    Scrive in runs/<out_name>/seed<k>/ i punteggi fusi, i pesi e metrics.json
+    nello stesso formato dei training, così le tabelle li trattano come un run.
+    """
+    from thesis import metrics
+
+    def carica(split):
+        dfs = [pd.read_csv(run_dir(n) / f"seed{seed}" / f"scores_{split}.csv") for n in names]
+        base = dfs[0].drop(columns="score")
+        for n, df in zip(names, dfs):
+            assert (df["file_name"].values == base["file_name"].values).all(), f"file in ordine diverso in {n}"
+        return base, np.stack([df["score"].to_numpy() for df in dfs], axis=1)
+
+    dev, s_dev = carica("dev")
+    theta = metrics.fit_fusion((dev["label"] == "spoof").astype(int), s_dev)
+    out = run_dir(out_name) / f"seed{seed}"
+    out.mkdir(parents=True, exist_ok=True)
+    results = {"seed": seed, "sistemi": names, "pesi": theta[:-1].tolist(), "offset": float(theta[-1]),
+               "stimati_su": "dev"}
+    for split in ("dev", "eval"):
+        base, s = carica(split)
+        fused = metrics.apply_fusion(s, theta)
+        base.assign(score=fused).to_csv(out / f"scores_{split}.csv", index=False)
+        y = (base["label"] == "spoof").astype(int).to_numpy()
+        m = metrics.all_metrics(y, fused)
+        m["eer_ci95"] = metrics.bootstrap_eer(y, fused)
+        m["eer_per_attacco"] = metrics.eer_by_group(y, fused, base["attack_label"])
+        m["eer_per_codec"] = metrics.eer_by_group(y, fused, base["codec"])
+        results[split] = m
+    results["epoca_migliore"] = 0  # nessun training: campo tenuto per compatibilità con le tabelle
+    (out / "metrics.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
+    return results
+
+
 def ogni_minuto(funzione, minuti: int) -> None:
     """Richiama funzione() ogni 60 s per `minuti` minuti, ripulendo l'output (interrompibile)."""
     from IPython.display import clear_output

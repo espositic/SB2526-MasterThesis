@@ -81,6 +81,33 @@ def eer_by_group(labels, scores, groups) -> dict:
     return out
 
 
+def fit_fusion(labels, scores: np.ndarray, n_iter: int = 50) -> np.ndarray:
+    """
+    Fusione lineare di più sistemi: llr = w·s + b, stimata con regressione
+    logistica a classi bilanciate (bonafide positivo). scores: (n, k), un
+    punteggio per sistema. Ritorna [w_1..w_k, b]. Con k = 1 è la calibrazione.
+    """
+    labels = np.asarray(labels).ravel()
+    s = np.asarray(scores, dtype=float).reshape(len(labels), -1)
+    t = (labels == 0).astype(float)
+    w = np.where(t == 1, 0.5 / t.mean(), 0.5 / (1 - t.mean()))
+    X = np.hstack([s, np.ones((len(s), 1))])
+    theta = np.zeros(X.shape[1])
+    for _ in range(n_iter):
+        p = 1 / (1 + np.exp(-(X @ theta)))
+        step = np.linalg.solve((X * (w * p * (1 - p))[:, None]).T @ X + 1e-9 * np.eye(X.shape[1]),
+                               X.T @ (w * (p - t)))
+        theta -= step
+        if np.abs(step).max() < 1e-10:
+            break
+    return theta
+
+
+def apply_fusion(scores: np.ndarray, theta: np.ndarray) -> np.ndarray:
+    s = np.asarray(scores, dtype=float).reshape(-1, len(theta) - 1)
+    return s @ theta[:-1] + theta[-1]
+
+
 def fit_calibration(labels, scores, n_iter: int = 50) -> tuple[float, float]:
     """
     Calibrazione lineare dei punteggi: llr = a·score + b, stimata con regressione
