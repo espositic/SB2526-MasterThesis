@@ -39,7 +39,7 @@ from thesis.augment import RawBoostConfig
 from thesis.config import ARTIFACTS_ROOT, MANIFESTS_DIR, PROJECT_ROOT
 from thesis.datasets import ASVspoof5
 from thesis.features import MelDataset
-from thesis.models import LCNN, LCNNConfig, MamBoConfig, XLSRMamBo, count_parameters
+from thesis.models import LCNN, LCNNConfig, MamBoConfig, Nes2NetConfig, WavLMNes2Net, XLSRMamBo, count_parameters
 from thesis.waveform import WaveformDataset
 
 logger = logging.getLogger(__name__)
@@ -48,6 +48,7 @@ logger = logging.getLogger(__name__)
 MODELS = {  # model_type → (classe della config, classe del modello, ingresso)
     "mambo": (MamBoConfig, XLSRMamBo, "waveform"),
     "lcnn": (LCNNConfig, LCNN, "mel"),
+    "nes2net": (Nes2NetConfig, WavLMNes2Net, "waveform"),
 }
 
 
@@ -65,6 +66,8 @@ class TrainConfig:
     mel_tag: str = "mel_sr16000_m128_fft1024_hop512"
     batch_size: int = 8
     accum_steps: int = 4             # batch effettivo 32, come nel paper
+    optimizer: str = "adamw"         # "adamw" | "adam" (Nes2Net usa Adam con weight decay L2)
+    betas: tuple = (0.9, 0.95)
     lr: float = 1e-5
     weight_decay: float = 0.05
     epochs: int = 20
@@ -87,8 +90,9 @@ class TrainConfig:
             raw["rawboost"] = RawBoostConfig(**raw["rawboost"])
         unknown = set(raw) - set(cls.__dataclass_fields__)
         assert not unknown, f"chiavi sconosciute nella config: {unknown}"
-        if "focal_alpha" in raw:
-            raw["focal_alpha"] = tuple(raw["focal_alpha"])
+        for key in ("focal_alpha", "betas"):
+            if key in raw:
+                raw[key] = tuple(raw[key])
         return cls(**raw, model=model)
 
 
@@ -223,7 +227,9 @@ def run(cfg: TrainConfig, seed: int) -> dict:
     logger.info("Parametri: %s", n_params)
 
     params = [p for p in model.parameters() if p.requires_grad]
-    optimizer = torch.optim.AdamW(params, lr=cfg.lr, betas=(0.9, 0.95), weight_decay=cfg.weight_decay)
+    assert cfg.optimizer in ("adamw", "adam"), f"optimizer sconosciuto: {cfg.optimizer}"
+    opt_cls = torch.optim.AdamW if cfg.optimizer == "adamw" else torch.optim.Adam
+    optimizer = opt_cls(params, lr=cfg.lr, betas=cfg.betas, weight_decay=cfg.weight_decay)
     steps_per_epoch = len(train_loader) // cfg.accum_steps
     total_steps = steps_per_epoch * cfg.epochs
     assert steps_per_epoch > 0, "troppi pochi dati per batch_size × accum_steps"
