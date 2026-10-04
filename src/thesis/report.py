@@ -172,6 +172,37 @@ def eer_per_gruppo(name: str, seeds: list[int], key: str, split: str = "eval") -
     return df.assign(media=df.mean(axis=1)).round(2)
 
 
+def calibra(name: str, seeds: list[int]) -> pd.DataFrame:
+    """
+    Per ogni seed: calibrazione lineare stimata sui punteggi del dev e applicata
+    all'eval. Scrive scores_<split>_calibrati.csv e calibrazione.json accanto ai
+    file originali (che non vengono toccati) e ritorna actDCF e Cllr prima/dopo.
+    EER e minDCF non possono cambiare (trasformazione monotona): fanno da controllo.
+    """
+    from thesis import metrics
+
+    rows = []
+    for s in seeds:
+        sd = run_dir(name) / f"seed{s}"
+        dev = pd.read_csv(sd / "scores_dev.csv")
+        y_dev = (dev["label"] == "spoof").astype(int).to_numpy()
+        a, b = metrics.fit_calibration(y_dev, dev["score"])
+        (sd / "calibrazione.json").write_text(json.dumps({"a": a, "b": b, "stimata_su": "dev"}, indent=2),
+                                              encoding="utf-8")
+        for split in ("dev", "eval"):
+            df = pd.read_csv(sd / f"scores_{split}.csv")
+            y = (df["label"] == "spoof").astype(int).to_numpy()
+            cal = metrics.apply_calibration(df["score"], a, b)
+            df.assign(score=cal).to_csv(sd / f"scores_{split}_calibrati.csv", index=False)
+            prima, dopo = metrics.all_metrics(y, df["score"]), metrics.all_metrics(y, cal)
+            assert abs(prima["eer"] - dopo["eer"]) < 1e-9 and abs(prima["min_dcf"] - dopo["min_dcf"]) < 1e-9, \
+                "la calibrazione ha cambiato EER/minDCF: non dovrebbe succedere"
+            rows.append({"seed": s, "split": split, "a": a, "b": b, "EER %": 100 * prima["eer"],
+                         "actDCF prima": prima["act_dcf"], "actDCF dopo": dopo["act_dcf"],
+                         "Cllr prima": prima["cllr"], "Cllr dopo": dopo["cllr"]})
+    return pd.DataFrame(rows)
+
+
 def ogni_minuto(funzione, minuti: int) -> None:
     """Richiama funzione() ogni 60 s per `minuti` minuti, ripulendo l'output (interrompibile)."""
     from IPython.display import clear_output

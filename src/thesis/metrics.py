@@ -81,6 +81,37 @@ def eer_by_group(labels, scores, groups) -> dict:
     return out
 
 
+def fit_calibration(labels, scores, n_iter: int = 50) -> tuple[float, float]:
+    """
+    Calibrazione lineare dei punteggi: llr = a·score + b, stimata con regressione
+    logistica (bonafide = classe positiva) e classi pesate in modo bilanciato.
+    Con pesi bilanciati il logit stimato corrisponde a un prior 50/50, quindi
+    l'uscita si può usare come log-likelihood ratio (alto = bonafide).
+    Stima con Newton-Raphson: due soli parametri, nessuna dipendenza esterna.
+    """
+    labels = np.asarray(labels).ravel()
+    s = np.asarray(scores, dtype=float).ravel()
+    t = (labels == 0).astype(float)                       # 1 = bonafide
+    w = np.where(t == 1, 0.5 / t.mean(), 0.5 / (1 - t.mean()))
+    X = np.stack([s, np.ones_like(s)], axis=1)
+    theta = np.zeros(2)
+    for _ in range(n_iter):
+        p = 1 / (1 + np.exp(-(X @ theta)))
+        grad = X.T @ (w * (p - t))
+        hess = (X * (w * p * (1 - p))[:, None]).T @ X
+        step = np.linalg.solve(hess + 1e-9 * np.eye(2), grad)
+        theta -= step
+        if np.abs(step).max() < 1e-10:
+            break
+    a, b = theta
+    assert a > 0, "calibrazione con pendenza non positiva: i punteggi del dev non separano le classi"
+    return float(a), float(b)
+
+
+def apply_calibration(scores, a: float, b: float) -> np.ndarray:
+    return a * np.asarray(scores, dtype=float) + b
+
+
 def bootstrap_eer(labels, scores, n_boot: int = 1000, seed: int = 0) -> tuple[float, float]:
     """Intervallo di confidenza al 95% dell'EER (ricampionamento stratificato per classe)."""
     labels = np.asarray(labels).ravel()
