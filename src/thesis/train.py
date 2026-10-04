@@ -39,7 +39,7 @@ from thesis.augment import RawBoostConfig
 from thesis.config import ARTIFACTS_ROOT, MANIFESTS_DIR, PROJECT_ROOT
 from thesis.datasets import ASVspoof5
 from thesis.features import MelDataset
-from thesis.models import LCNN, AASISTConfig, LCNNConfig, XLSRAASIST, MamBoConfig, Nes2NetConfig, WavLMNes2Net, XLSRMamBo, count_parameters
+from thesis.models import LCNN, AASISTConfig, LCNNConfig, SLSConfig, XLSRAASIST, XLSRSLS, MamBoConfig, Nes2NetConfig, WavLMNes2Net, XLSRMamBo, count_parameters
 from thesis.waveform import WaveformDataset
 
 logger = logging.getLogger(__name__)
@@ -50,6 +50,7 @@ MODELS = {  # model_type → (classe della config, classe del modello, ingresso)
     "lcnn": (LCNNConfig, LCNN, "mel"),
     "nes2net": (Nes2NetConfig, WavLMNes2Net, "waveform"),
     "aasist": (AASISTConfig, XLSRAASIST, "waveform"),
+    "sls": (SLSConfig, XLSRSLS, "waveform"),
 }
 
 
@@ -153,7 +154,7 @@ def autocast(device: torch.device):
 def predict(model, loader, device) -> tuple[np.ndarray, float]:
     """Punteggi (logit bonafide − logit spoof) e loss media di cross-entropy."""
     model.eval()
-    scores, loss_sum, n = [], 0.0, 0
+    scores, layer_w, loss_sum, n = [], [], 0.0, 0
     for wave, label in tqdm(loader, desc="valutazione", leave=False):
         wave, label = wave.to(device, non_blocking=True), label.to(device)
         with autocast(device):
@@ -162,6 +163,9 @@ def predict(model, loader, device) -> tuple[np.ndarray, float]:
         loss_sum += F.cross_entropy(logits, label, reduction="sum").item()
         n += len(label)
         scores.append((logits[:, 0] - logits[:, 1]).cpu().numpy())
+        if getattr(model, "last_layer_weights", None) is not None:  # SLS: pesi degli strati per clip
+            layer_w.append(model.last_layer_weights.float().cpu().numpy())
+    predict.layer_weights = np.concatenate(layer_w) if layer_w else None
     return np.concatenate(scores), loss_sum / n
 
 
@@ -328,6 +332,9 @@ def run(cfg: TrainConfig, seed: int) -> dict:
     for split in ("dev", "eval"):
         scores, _ = predict(model, eval_loaders[split], device)
         save_scores(out_dir / f"scores_{split}.csv", data[split], scores)
+        if predict.layer_weights is not None:  # pesi degli strati (SLS), stesso ordine di scores_<split>.csv
+            assert len(predict.layer_weights) == len(scores)
+            np.save(out_dir / f"layer_weights_{split}.npy", predict.layer_weights)
         results[split] = split_metrics(data[split], scores)
 
     tmp = out_dir / "metrics.json.tmp"
