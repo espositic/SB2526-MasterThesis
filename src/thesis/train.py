@@ -25,6 +25,7 @@ import subprocess
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -34,6 +35,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from thesis import metrics
+from thesis.augment import RawBoostConfig
 from thesis.config import ARTIFACTS_ROOT, MANIFESTS_DIR, PROJECT_ROOT
 from thesis.datasets import ASVspoof5
 from thesis.features import MelDataset
@@ -72,6 +74,7 @@ class TrainConfig:
     focal_alpha: tuple = (0.5, 0.5)  # [bonafide, spoof]: i nostri subset sono bilanciati
     num_workers: int = 4
     subset_frac: float = 1.0         # < 1 solo per lo smoke test
+    rawboost: Optional[RawBoostConfig] = None  # solo forma d'onda, solo train; None = disattivato
     model: object = field(default_factory=MamBoConfig)
 
     @classmethod
@@ -80,6 +83,8 @@ class TrainConfig:
         model_type = raw.get("model_type", "mambo")
         assert model_type in MODELS, f"model_type sconosciuto: {model_type}"
         model = MODELS[model_type][0](**raw.pop("model", {}))
+        if raw.get("rawboost") is not None:
+            raw["rawboost"] = RawBoostConfig(**raw["rawboost"])
         unknown = set(raw) - set(cls.__dataclass_fields__)
         assert not unknown, f"chiavi sconosciute nella config: {unknown}"
         if "focal_alpha" in raw:
@@ -192,14 +197,23 @@ def run(cfg: TrainConfig, seed: int) -> dict:
         split: load_split(ds, split, manifest, cfg.subset_frac, seed, check_audio=input_kind == "waveform")
         for split, manifest in (("train", cfg.train_manifest), ("dev", cfg.dev_manifest), ("eval", cfg.eval_manifest))
     }
+    assert cfg.rawboost is None or input_kind == "waveform", "RawBoost si applica solo alla forma d'onda"
     if input_kind == "waveform":
-        make_ds = lambda subset: WaveformDataset(ds, subset, cfg.n_samples)
+        make_ds = lambda subset, augment=None: WaveformDataset(ds, subset, cfg.n_samples, augment)
     else:
         feat_dir = ARTIFACTS_ROOT / "features" / ds.name / cfg.mel_tag
-        make_ds = lambda subset: MelDataset(feat_dir, subset, cfg.n_frames)
+        make_ds = lambda subset, augment=None: MelDataset(feat_dir, subset, cfg.n_frames)
+    train_ds = make_ds(data["train"], cfg.rawboost)  # augmentation solo sul train
+    if cfg.rawboost is not None:
+        # Controllo esplicito: la clip aumentata deve differire da quella originale
+        raw_wave, aug_wave = make_ds(data["train"])[0][0], train_ds[0][0]
+        diff = float((raw_wave - aug_wave).abs().mean())
+        assert diff > 0, "RawBoost attivo ma la forma d'onda non è cambiata"
+        logger.info("RawBoost attivo (algoritmo %d): differenza media su una clip di prova %.4f",
+                    cfg.rawboost.algo, diff)
     loader_args = dict(num_workers=cfg.num_workers, pin_memory=device.type == "cuda",
                        persistent_workers=cfg.num_workers > 0)
-    train_loader = DataLoader(make_ds(data["train"]), batch_size=cfg.batch_size,
+    train_loader = DataLoader(train_ds, batch_size=cfg.batch_size,
                               shuffle=True, drop_last=True, **loader_args)
     eval_loaders = {s: DataLoader(make_ds(data[s]), batch_size=2 * cfg.batch_size,
                                   shuffle=False, **loader_args) for s in ("dev", "eval")}
@@ -279,7 +293,8 @@ def run(cfg: TrainConfig, seed: int) -> dict:
         y_dev = (data["dev"]["label"] == "spoof").astype(int).to_numpy()
         dev_eer = metrics.eer(y_dev, dev_scores)
         row = {"epoca": epoch, "train_loss": loss_sum / n_batches, "dev_loss": dev_loss, "dev_eer": dev_eer,
-               "lr": scheduler.get_last_lr()[0], "sec_train": round(train_time),
+               "lr": scheduler.get_last_lr()[0], "rawboost": cfg.rawboost.algo if cfg.rawboost else 0,
+               "sec_train": round(train_time),
                "sec_totale": round(time.time() - t0),
                "gpu_max_gb": round(torch.cuda.max_memory_allocated() / 2**30, 2) if on_gpu else 0.0}
         pd.DataFrame([row]).to_csv(log_path, mode="a", header=not log_path.exists(), index=False)

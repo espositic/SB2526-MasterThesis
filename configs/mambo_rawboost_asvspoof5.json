@@ -1,0 +1,30 @@
+{
+    "name":  "mambo_rawboost_asvspoof5",
+    "train_manifest":  "asvspoof5_train_n5000_seed42_dur1-15.csv",
+    "dev_manifest":  "asvspoof5_dev_n2500_seed42_dur1-15.csv",
+    "eval_manifest":  "asvspoof5_eval_n5000_seed42_dur1-15.csv",
+    "n_samples":  66800,
+    "batch_size":  8,
+    "accum_steps":  4,
+    "lr":  1E-05,
+    "weight_decay":  0.05,
+    "epochs":  20,
+    "patience":  3,
+    "warmup_ratio":  0.1,
+    "focal_gamma":  2.0,
+    "focal_alpha":  [
+                        0.5,
+                        0.5
+                    ],
+    "num_workers":  4,
+    "model":  {
+                  "n_layers":  5,
+                  "n_hydra":  3,
+                  "freeze_ssl":  false,
+                  "freeze_ssl_layers":  0,
+                  "gradient_checkpointing":  true
+              },
+    "rawboost":  {
+                     "algo":  5
+                 }
+}
