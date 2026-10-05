@@ -37,3 +37,6 @@ build/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Esperimenti abbandonati o interrotti, tenuti solo in locale
+archivio/
