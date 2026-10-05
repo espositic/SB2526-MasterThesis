@@ -70,11 +70,13 @@ def stato(name: str, config_file: str, seeds: list[int], log_file: Path, log_fer
     print(f"[{name}]")
     avvisi = []
     attivo = processo_attivo(config_file)
-    completati = [s for s in seeds if (rd / f"seed{s}" / "metrics.json").exists()]
+    completati = [s for s in seeds if (rd / f"seed{s}" / "metrics.json").exists() or (rd / f"seed{s}" / "POTATA.txt").exists()]
 
     for s in seeds:
         sd = rd / f"seed{s}"
-        if (sd / "metrics.json").exists():
+        if (sd / "POTATA.txt").exists():
+            print(f"  seed {s}: POTATO — {(sd / 'POTATA.txt').read_text(encoding='utf-8').strip()}")
+        elif (sd / "metrics.json").exists():
             r = json.loads((sd / "metrics.json").read_text(encoding="utf-8"))
             print(f"  seed {s}: COMPLETATO — epoca migliore {r['epoca_migliore']}, "
                   f"EER dev {100 * r['dev']['eer']:.2f}%, EER eval {100 * r['eval']['eer']:.2f}%")
