@@ -71,9 +71,12 @@ class TrainConfig:
     optimizer: str = "adamw"         # "adamw" | "adam" (Nes2Net usa Adam con weight decay L2)
     betas: tuple = (0.9, 0.95)
     lr: float = 1e-5
+    lr_head: Optional[float] = None  # lr del back-end; None = stesso lr per tutto il modello
     weight_decay: float = 0.05
     epochs: int = 20
     patience: int = 7                # early stopping sull'EER del dev
+    prune_epoch: int = 0             # > 0: run abbandonata se a quell'epoca l'EER dev migliore è > prune_eer
+    prune_eer: float = 0.30
     warmup_ratio: float = 0.1        # warmup lineare 10% + coseno fino al 10% del lr
     focal_gamma: float = 2.0
     focal_alpha: tuple = (0.5, 0.5)  # [bonafide, spoof]: i nostri subset sono bilanciati
@@ -190,6 +193,9 @@ def run(cfg: TrainConfig, seed: int) -> dict:
     if (out_dir / "metrics.json").exists():
         logger.info("%s esiste già: seed %d saltato", out_dir / "metrics.json", seed)
         return json.loads((out_dir / "metrics.json").read_text(encoding="utf-8"))
+    if (out_dir / "POTATA.txt").exists():
+        logger.info("%s: seed %d già potato, saltato", cfg.name, seed)
+        return {"seed": seed, "potata": True}
     out_dir.mkdir(parents=True, exist_ok=True)
 
     set_seed(seed)
@@ -234,7 +240,16 @@ def run(cfg: TrainConfig, seed: int) -> dict:
     params = [p for p in model.parameters() if p.requires_grad]
     assert cfg.optimizer in ("adamw", "adam"), f"optimizer sconosciuto: {cfg.optimizer}"
     opt_cls = torch.optim.AdamW if cfg.optimizer == "adamw" else torch.optim.Adam
-    optimizer = opt_cls(params, lr=cfg.lr, betas=cfg.betas, weight_decay=cfg.weight_decay)
+    if cfg.lr_head is None:
+        groups = [{"params": params}]
+    else:
+        # Front-end SSL pre-addestrato con lr, back-end (da zero) con lr_head
+        ssl_ids = {id(p) for p in model.ssl.parameters()}
+        groups = [{"params": [p for p in params if id(p) in ssl_ids]},
+                  {"params": [p for p in params if id(p) not in ssl_ids], "lr": cfg.lr_head}]
+        assert all(g["params"] for g in groups), "uno dei due gruppi di parametri è vuoto"
+        logger.info("lr front-end %.1e, lr back-end %.1e", cfg.lr, cfg.lr_head)
+    optimizer = opt_cls(groups, lr=cfg.lr, betas=cfg.betas, weight_decay=cfg.weight_decay)
     steps_per_epoch = len(train_loader) // cfg.accum_steps
     total_steps = steps_per_epoch * cfg.epochs
     assert steps_per_epoch > 0, "troppi pochi dati per batch_size × accum_steps"
@@ -319,6 +334,13 @@ def run(cfg: TrainConfig, seed: int) -> dict:
             if waited >= cfg.patience:
                 logger.info("Early stopping all'epoca %d (migliore: %d)", epoch, best_epoch)
                 stop = True
+
+        if cfg.prune_epoch and epoch == cfg.prune_epoch and best_eer > cfg.prune_eer:
+            # Potatura: la run non è promettente, si chiude senza valutazione finale
+            msg = f"run potata all'epoca {epoch}: EER dev migliore {best_eer:.4f} > {cfg.prune_eer}"
+            logger.info(msg)
+            (out_dir / "POTATA.txt").write_text(msg + "\n", encoding="utf-8")
+            return {"seed": seed, "potata": True, "best_dev_eer": best_eer}
 
         save_atomic({
             "epoch": epoch, "model": model.state_dict(), "optimizer": optimizer.state_dict(),

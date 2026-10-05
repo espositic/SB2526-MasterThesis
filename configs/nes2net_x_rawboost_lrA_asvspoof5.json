@@ -1,0 +1,38 @@
+{
+  "name": "nes2net_x_rawboost_lrA_asvspoof5",
+  "train_manifest": "asvspoof5_train_n5000_seed42_dur1-15.csv",
+  "dev_manifest": "asvspoof5_dev_n2500_seed42_dur1-15.csv",
+  "eval_manifest": "asvspoof5_eval_n5000_seed42_dur1-15.csv",
+  "n_samples": 66800,
+  "batch_size": 8,
+  "accum_steps": 4,
+  "lr": 1e-05,
+  "weight_decay": 0.05,
+  "epochs": 20,
+  "patience": 3,
+  "warmup_ratio": 0.1,
+  "focal_gamma": 2.0,
+  "focal_alpha": [
+    0.5,
+    0.5
+  ],
+  "num_workers": 4,
+  "model": {
+    "nes_ratio": [
+      8,
+      8
+    ],
+    "se_ratio": 1,
+    "dilation": 1,
+    "pool": "mean",
+    "freeze_ssl": false,
+    "gradient_checkpointing": true
+  },
+  "rawboost": {
+    "algo": 5
+  },
+  "model_type": "nes2net",
+  "lr_head": 0.0001,
+  "prune_epoch": 3,
+  "prune_eer": 0.3
+}
