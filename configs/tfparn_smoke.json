@@ -1,0 +1,14 @@
+{
+  "name": "tfparn_smoke",
+  "model_type": "tfparn",
+  "subset_frac": 0.04,
+  "epochs": 2,
+  "patience": 2,
+  "batch_size": 64,
+  "accum_steps": 1,
+  "num_workers": 4,
+  "pairwise_weight": 0.3,
+  "rawboost": {
+    "algo": 5
+  }
+}

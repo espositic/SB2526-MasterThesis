@@ -1,6 +1,7 @@
 """
-Training e valutazione dei detector: XLSR-MamBo su forma d'onda (GPU) e
-LCNN sui Mel-spettrogrammi già estratti (anche solo CPU).
+Training e valutazione dei detector: modelli su forma d'onda (XLSR-MamBo,
+WavLM + MHFA, MoLEx, XLSR-Conformer + TCM, TFPARN; GPU) e LCNN sui
+Mel-spettrogrammi già estratti (anche solo CPU).
 
 Entry point unico, pensato per girare in background senza Jupyter:
     python -m thesis.train --config configs/mambo_asvspoof5.json --seed 1
@@ -39,7 +40,8 @@ from thesis.augment import RawBoostConfig
 from thesis.config import ARTIFACTS_ROOT, MANIFESTS_DIR, PROJECT_ROOT
 from thesis.datasets import ASVspoof5
 from thesis.features import MelDataset
-from thesis.models import LCNN, LCNNConfig, MamBoConfig, XLSRMamBo, count_parameters
+from thesis.models import (LCNN, TFPARN, LCNNConfig, MamBoConfig, MHFAConfig, MoLExConfig, TCMConfig,
+                           TFPARNConfig, WavLMMHFA, WavLMMoLEx, XLSRConformerTCM, XLSRMamBo, count_parameters)
 from thesis.waveform import WaveformDataset
 
 logger = logging.getLogger(__name__)
@@ -48,6 +50,10 @@ logger = logging.getLogger(__name__)
 MODELS = {  # model_type → (classe della config, classe del modello, ingresso)
     "mambo": (MamBoConfig, XLSRMamBo, "waveform"),
     "lcnn": (LCNNConfig, LCNN, "mel"),
+    "mhfa": (MHFAConfig, WavLMMHFA, "waveform"),
+    "molex": (MoLExConfig, WavLMMoLEx, "waveform"),
+    "tcm": (TCMConfig, XLSRConformerTCM, "waveform"),
+    "tfparn": (TFPARNConfig, TFPARN, "waveform"),
 }
 
 
@@ -66,12 +72,15 @@ class TrainConfig:
     batch_size: int = 8
     accum_steps: int = 4             # batch effettivo 32, come nel paper
     lr: float = 1e-5
+    lr_head: Optional[float] = None  # lr di tutto ciò che non è il front-end SSL; None = lr unico
     weight_decay: float = 0.05
     epochs: int = 20
     patience: int = 7                # early stopping sull'EER del dev
     warmup_ratio: float = 0.1        # warmup lineare 10% + coseno fino al 10% del lr
     focal_gamma: float = 2.0
     focal_alpha: tuple = (0.5, 0.5)  # [bonafide, spoof]: i nostri subset sono bilanciati
+    pairwise_weight: float = 0.0     # ranking loss a coppie bonafide/spoof (TFPARN: 0.3); 0 = spenta
+    pairwise_margin: float = 1.0
     num_workers: int = 4
     subset_frac: float = 1.0         # < 1 solo per lo smoke test
     rawboost: Optional[RawBoostConfig] = None  # solo forma d'onda, solo train; None = disattivato
@@ -103,6 +112,18 @@ def focal_loss(logits, target, gamma: float, alpha: tuple) -> torch.Tensor:
     logp = F.log_softmax(logits.float(), dim=-1).gather(1, target[:, None]).squeeze(1)
     weight = torch.tensor(alpha, device=logits.device)[target]
     return (-weight * (1 - logp.exp()) ** gamma * logp).mean()
+
+
+def pairwise_loss(logits, target, margin: float) -> torch.Tensor:
+    """
+    Hinge su tutte le coppie (bonafide, spoof) del batch: max(0, margine − (s_bonafide − s_spoof)),
+    con s = logit bonafide − logit spoof, il punteggio usato per l'EER. 0 se manca una classe.
+    """
+    score = logits[:, 0].float() - logits[:, 1].float()
+    bona, spoof = score[target == 0], score[target == 1]
+    if len(bona) == 0 or len(spoof) == 0:
+        return score.sum() * 0
+    return F.relu(margin - (bona[:, None] - spoof[None, :])).mean()
 
 
 def lr_lambda(step: int, total: int, warmup: int, min_ratio: float = 0.1) -> float:
@@ -222,8 +243,16 @@ def run(cfg: TrainConfig, seed: int) -> dict:
     n_params = count_parameters(model)
     logger.info("Parametri: %s", n_params)
 
-    params = [p for p in model.parameters() if p.requires_grad]
-    optimizer = torch.optim.AdamW(params, lr=cfg.lr, betas=(0.9, 0.95), weight_decay=cfg.weight_decay)
+    named = [(n, p) for n, p in model.named_parameters() if p.requires_grad]
+    params = [p for _, p in named]
+    groups = [{"params": params}]
+    if cfg.lr_head is not None:
+        # Due gruppi: front-end SSL (parametri "ssl.*", esperti di MoLEx compresi) a lr, il resto
+        # a lr_head; warmup e coseno scalano entrambi con lo stesso fattore
+        groups = [{"params": [p for n, p in named if n.startswith("ssl.")], "lr": cfg.lr},
+                  {"params": [p for n, p in named if not n.startswith("ssl.")], "lr": cfg.lr_head}]
+    optimizer = torch.optim.AdamW([g for g in groups if g["params"]], lr=cfg.lr, betas=(0.9, 0.95),
+                                  weight_decay=cfg.weight_decay)
     steps_per_epoch = len(train_loader) // cfg.accum_steps
     total_steps = steps_per_epoch * cfg.epochs
     assert steps_per_epoch > 0, "troppi pochi dati per batch_size × accum_steps"
@@ -277,6 +306,10 @@ def run(cfg: TrainConfig, seed: int) -> dict:
             loss = model.loss_fn(logits, label) if hasattr(model, "loss_fn") else None
             if loss is None:  # loss di default: focal (con gamma=0 è la cross-entropy pesata)
                 loss = focal_loss(logits, label, cfg.focal_gamma, cfg.focal_alpha)
+            if cfg.pairwise_weight > 0:
+                loss = loss + cfg.pairwise_weight * pairwise_loss(logits, label, cfg.pairwise_margin)
+            if getattr(model, "aux_loss", None) is not None:  # es. ortogonalità degli esperti di MoLEx
+                loss = loss + model.aux_loss
             assert torch.isfinite(loss), f"loss non finita all'epoca {epoch}, batch {i}"
             (loss / cfg.accum_steps).backward()
             if i % cfg.accum_steps == 0:
