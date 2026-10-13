@@ -1,7 +1,8 @@
 """
-TFPARN: Transformer su log-Mel con focal loss e ranking loss a coppie
-("Transformer with Focal and Pairwise AUC Ranking Network"), modello di
-confronto per la famiglia "spettrogramma + rete neurale" del capitolo 2.
+TFPARN ("Transformer-based Focal-Pairwise Attentive Ranking Network"): Transformer
+su log-Mel con focal loss e ranking loss a coppie (Yin e Zhao, "A training-efficient
+transformer-based anti-spoofing network for logical access in ASVspoof 5", arXiv
+2606.02980), modello di confronto per la famiglia "spettrogramma + rete neurale".
 Codice originale: https://github.com/SomeB1oody/TFPARN (licenza MIT, vedi
 THIRD_PARTY_NOTICES.md), con AASIST e RawNet2 nello stesso repository.
 
