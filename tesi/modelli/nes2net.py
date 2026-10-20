@@ -1,5 +1,5 @@
 # Nes2Net-X (Liu, Truong, Das, Lee, Li, "Nes2Net: A Lightweight Nested Architecture for
-# Foundation Model Driven Speech Anti-spoofing", IEEE TIFS 2025).
+# Foundation Model Driven Speech Anti-spoofing", arXiv 2504.05657, 2025).
 # Port del back-end di github.com/Liu-Tianchi/Nes2Net_ASVspoof_ITW (branch asvspoof5,
 # models/wavlm_nes2net.py, licenza Apache 2.0) con la configurazione usata su ASVspoof 5:
 # Nes_ratio [8, 8], dilatazione 1, pooling medio, SE_ratio 1.
