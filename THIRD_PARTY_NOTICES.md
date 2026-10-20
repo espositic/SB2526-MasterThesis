@@ -1,6 +1,6 @@
 # Codice di terze parti
 
-Alcune parti di `src/thesis/` sono port di codice pubblicato con licenza MIT.
+Alcune parti di `tesi/` sono port di codice pubblicato con licenza MIT o Apache 2.0.
 La licenza chiede di riportare la nota di copyright e il testo della licenza,
 che sono qui sotto. Gli altri modelli sono re-implementati dai paper, senza
 copiare codice.
@@ -9,10 +9,9 @@ copiare codice.
 
 | File | Origine | Copyright |
 |---|---|---|
-| `src/thesis/models/mambo.py`, `src/thesis/models/hydra.py` | [saki-ciallo/MamBo-for-ADD](https://github.com/saki-ciallo/MamBo-for-ADD) | Copyright (c) 2026 ayase |
-| `src/thesis/augment.py` (RawBoost) | [TakHemlata/RawBoost-antispoofing](https://github.com/TakHemlata/RawBoost-antispoofing), nella versione di MamBo-for-ADD | Copyright (c) 2021 Hemlata; Copyright (c) 2026 ayase |
-| `src/thesis/models/conformer_tcm.py` | [ductuantruong/tcm_add](https://github.com/ductuantruong/tcm_add) | Copyright (c) 2024 Truong Duc Tuan |
-| `src/thesis/models/tfparn.py` | [SomeB1oody/TFPARN](https://github.com/SomeB1oody/TFPARN) | Copyright (c) 2025 SomeB1oody |
+| `tesi/modelli/mambo.py`, `tesi/modelli/hydra.py` | [saki-ciallo/MamBo-for-ADD](https://github.com/saki-ciallo/MamBo-for-ADD) | Copyright (c) 2026 ayase |
+| `tesi/augmentation.py` (RawBoost) | [TakHemlata/RawBoost-antispoofing](https://github.com/TakHemlata/RawBoost-antispoofing), nella versione di MamBo-for-ADD | Copyright (c) 2021 Hemlata; Copyright (c) 2026 ayase |
+| `tesi/modelli/tfparn.py` | [SomeB1oody/TFPARN](https://github.com/SomeB1oody/TFPARN) | Copyright (c) 2025 SomeB1oody |
 
 Testo della licenza, uguale per tutti:
 
@@ -38,13 +37,22 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## Port di codice con licenza Apache 2.0
+
+| File | Origine |
+|---|---|
+| `tesi/modelli/nes2net.py` (back-end Nested Res2Net TDNN) | [Liu-Tianchi/Nes2Net_ASVspoof_ITW](https://github.com/Liu-Tianchi/Nes2Net_ASVspoof_ITW), branch `asvspoof5`, `models/wavlm_nes2net.py` |
+| `tesi/augmentation.py` (classe `RumoreRiverbero`) | stesso repository, `musan.py` e `rir.py` |
+
+Il codice è distribuito con la [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+Modifiche: nomi e commenti in italiano, WavLM caricato da Hugging Face, solo la configurazione
+usata su ASVspoof 5 (pooling medio, niente ASTP), generatore casuale passato come argomento.
+
 ## Re-implementazioni dai paper
 
-Per questi modelli il codice degli autori non ha licenza, quindi non se ne
-può copiare nulla: sono scritti da zero seguendo il paper.
+Per questo modello il codice degli autori non ha licenza, quindi non se ne
+può copiare nulla: è scritto da zero seguendo il paper.
 
 | File | Paper | Codice degli autori (senza licenza) |
 |---|---|---|
-| `src/thesis/models/mhfa.py` | Peng et al., SLT 2022; Stourbe et al., arXiv 2409.05032 | JunyiPeng00/SLT22_MultiHead-Factorized-Attentive-Pooling |
-| `src/thesis/models/molex.py` | Pan, Sailor, Wu, arXiv 2509.09175 | pandarialTJU/MOLEx-ORLoss |
-| variante `kan=True` di `conformer_tcm.py` | Phuong e Tran, arXiv 2510.06706 | non pubblicato |
+| `tesi/modelli/mhfa.py` | Peng et al., SLT 2022; Stourbe et al., arXiv 2409.05032 | JunyiPeng00/SLT22_MultiHead-Factorized-Attentive-Pooling |

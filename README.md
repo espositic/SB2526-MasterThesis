@@ -1,77 +1,54 @@
 # SB2526-MasterThesis
 
-Esperimenti di anti-spoofing vocale (bonafide vs spoof) su più dataset e modelli.
+Tesi magistrale: rilevamento di audio contraffatto (anti-spoofing vocale, bonafide contro spoof)
+con modelli auto-supervisionati, confronto di data augmentation e test su più dataset.
 
 ## Struttura
 
 ```
-src/thesis/            libreria riusabile, importata dai notebook
-  config.py            percorsi (locale / Colab), seed
-  datasets/            un modulo per dataset + interfaccia comune (base.py)
-  features/            estrazione feature (Mel-spettrogrammi)
-  models/              modelli (XLSR-MamBo, WavLM + MHFA, MoLEx, XLSR-Conformer + TCM, TFPARN, LCNN)
-  waveform.py          dataset su forma d'onda grezza da manifest
-  metrics.py           EER, minDCF, actDCF, Cllr, EER per gruppo, bootstrap
-  train.py             entry point di training/valutazione
-configs/               una config JSON per esperimento
-notebooks/             un notebook per passo: NN_<dataset>_<cosa>.ipynb
-manifests/             sottoinsiemi selezionati (committati per riproducibilità)
-data/                  dataset grezzi        (ignorato da git)
-artifacts/             feature, modelli, risultati (ignorato da git)
+tesi/                   codice, importato dai notebook
+  percorsi.py           cartelle del progetto (data/, manifests/, artifacts/)
+  dati.py               download, lettura dei protocolli, liste di file, Dataset PyTorch
+  augmentation.py       RawBoost, rumore + riverbero (MUSAN, RIR), codec (MP3, AAC, Opus)
+  modelli/              XLSR-MamBo, Nes2Net-X, WavLM + MHFA, TFPARN
+  training.py           training con early stopping sul dev, test
+  metriche.py           EER, minDCF, actDCF, Cllr, EER per attacco
+  risultati.py          tabelle dei risultati
+notebooks/
+  01_preparazione_dati  download dei dataset e creazione delle liste
+  02_training           training di un modello (scelta di modello, dataset, augmentation, seed)
+  03_test               punteggi sulle liste di test
+  04_risultati          tabelle e grafici
+manifests/              liste di file (CSV), committate per poter rifare gli esperimenti
+data/                   dataset                         (non in git)
+artifacts/esperimenti/  pesi, log e punteggi di ogni esperimento   (non in git)
 ```
 
-## Setup locale
+Tutto si lancia dai notebook, in ordine. Le etichette sono 0 = bonafide e 1 = spoof;
+il punteggio di un modello è logit bonafide − logit spoof, quindi alto = bonafide.
+
+## Installazione
 
 ```bash
 python -m venv .venv
 .venv\Scripts\activate
-pip install torch --index-url https://download.pytorch.org/whl/cu126   # CUDA, da adattare al driver
-pip install -e ".[notebook]"
+pip install torch --index-url https://download.pytorch.org/whl/cu126
+pip install -r requirements.txt
 ```
 
-## Training
+## Esperimenti
 
-```bash
-python -m thesis.train --config configs/mambo_asvspoof5.json --seed 1 2 3
-```
+| | |
+|---|---|
+| Modelli | XLSR-MamBo, Nes2Net-X, WavLM Base + MHFA (con SSL); TFPARN (su log-Mel, senza SSL) |
+| Training | ASVspoof 5 (10.000 clip bilanciate) oppure ASVspoof 2019 LA (intero) |
+| Test | ASVspoof 5, ASVspoof 2019 LA, ASVspoof 2021 LA e DF, In-the-Wild |
+| Augmentation | nessuna, RawBoost, rumore + riverbero, codec; SpecAugment per TFPARN |
 
-Risultati in `artifacts/runs/<nome>/seed<k>/` (config, log per epoca, punteggi,
-`metrics.json`); i seed già completati vengono saltati. Prima di un training
-lungo conviene lanciare lo smoke test del modello, `configs/<modello>_smoke.json`
-(pochi file, 2 epoche). Il codice preso da altri repository è elencato in
-`THIRD_PARTY_NOTICES.md`.
+Ricetta comune: AdamW, lr 1e-5, warmup + coseno, focal loss, batch 8 × 4, clip di 4,175 s,
+massimo 20 epoche, stop dopo 3 epoche senza miglioramenti dell'EER sul dev, 3 seed.
+Le eccezioni (MHFA e TFPARN) sono in `tesi/modelli/__init__.py`.
 
-Configurazioni disponibili:
+Ogni esperimento finisce in `artifacts/esperimenti/<modello>_<dataset>_<augmentation>/seed<k>/`.
 
-| config | modello | ingresso | hardware |
-|---|---|---|---|
-| `mambo_asvspoof5` | XLSR-MamBo (MamBo-3-Hydra-N3) | forma d'onda | GPU ≥ 8 GB |
-| `mhfa_rawboost_asvspoof5` | WavLM Base fine-tuned + MHFA | forma d'onda | GPU ≥ 8 GB |
-| `mhfa_frozen_rawboost_asvspoof5` | WavLM Base congelato + MHFA | forma d'onda | GPU |
-| `molex_rawboost_asvspoof5` | MoLEx: WavLM-Large (12 layer) congelato + esperti LoRA | forma d'onda | GPU ≥ 8 GB |
-| `molex_lora_rawboost_asvspoof5` | ablation: un solo LoRA, senza esperti | forma d'onda | GPU ≥ 8 GB |
-| `tcm_rawboost_asvspoof5` | XLSR-Conformer + TCM | forma d'onda | GPU ≥ 8 GB |
-| `tcm_kan_rawboost_asvspoof5` | variante XLSR-Kanformer (ChebyKAN) | forma d'onda | GPU ≥ 8 GB |
-| `tfparn_rawboost_asvspoof5` | TFPARN: Transformer su log-Mel, focal + ranking a coppie | forma d'onda | GPU |
-| `lcnn_asvspoof5` | LCNN, pooling medio, cross-entropy | Mel | CPU |
-| `lcnn_lstm_asvspoof5` | + BiLSTM e attention pooling | Mel | CPU |
-| `lcnn_lstm_specaug_asvspoof5` | + SpecAugment in training | Mel | CPU |
-| `lcnn_lstm_specaug_oc_asvspoof5` | + OC-Softmax | Mel | CPU |
-
-Le LCNN non leggono l'audio: servono solo le feature Mel del notebook 01
-(`artifacts/features/asvspoof5/<tag>/`) e i TSV di protocollo in `data/asvspoof5/`.
-
-Su Colab la prima cella di ogni notebook clona il repo e installa tutto.
-Le radici di dati e artefatti si cambiano con `THESIS_DATA_ROOT` e `THESIS_ARTIFACTS_ROOT`.
-
-## Manifest
-
-`manifests/<dataset>_<split>_n<N>_seed<S>_dur<min>-<max>.csv`: prima riga con i
-parametri in JSON, poi `file_name,label,audio_path,duration` con percorsi relativi
-alla radice del dataset.
-
-## Aggiungere un dataset
-
-Crea `src/thesis/datasets/<nome>.py` con una sottoclasse di `BaseDataset` che
-implementa `prepare(split)` e `load_protocol(split)`; subset bilanciato, manifest
-ed estrazione feature funzionano senza altre modifiche.
+Il codice preso da altri repository è elencato in `THIRD_PARTY_NOTICES.md`.

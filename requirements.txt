@@ -1,0 +1,11 @@
+# torch va installato prima, con la versione CUDA giusta (vedi README)
+transformers
+huggingface_hub
+numpy
+scipy
+pandas
+soundfile
+tqdm
+matplotlib
+imageio-ffmpeg   # ffmpeg per l'augmentation con i codec
+ipykernel        # per usare i notebook in VS Code
