@@ -51,6 +51,37 @@ def tabella_media(tabella):
     return media.reset_index()
 
 
+NOMI_MODELLI = {"mambo": "XLSR-MamBo", "nes2net": "Nes2Net-X", "mhfa": "WavLM + MHFA", "tfparn": "TFPARN"}
+
+
+def salva_excel(per_seed, file):
+    """
+    Tabella Excel dei risultati (serve openpyxl). Tre fogli:
+    - Riepilogo: media ± deviazione standard sui seed, una riga per esperimento e lista di test
+    - Per seed: tutte le metriche di ogni seed
+    - Dev: EER sul dev dell'epoca migliore di ogni seed
+    """
+    gruppi = per_seed.groupby(["modello", "train", "augmentation", "test"])
+    riepilogo = gruppi.agg(seed=("seed", "count"),
+                           eer=("EER (%)", "mean"), eer_std=("EER (%)", "std"),
+                           mindcf=("minDCF", "mean"), mindcf_std=("minDCF", "std"),
+                           actdcf=("actDCF", "mean"), cllr=("Cllr", "mean")).reset_index()
+    riepilogo["modello"] = riepilogo["modello"].map(NOMI_MODELLI).fillna(riepilogo["modello"])
+    riepilogo = riepilogo.sort_values(["test", "train", "eer"]).round(3)
+    riepilogo.columns = ["Modello", "Train", "Augmentation", "Test", "Seed", "EER (%)", "EER std",
+                         "minDCF", "minDCF std", "actDCF", "Cllr"]
+
+    esperimenti = leggi_esperimenti().drop(columns="cartella")
+    with pd.ExcelWriter(file) as excel:
+        for nome, tabella in [("Riepilogo", riepilogo), ("Per seed", per_seed.round(3)), ("Dev", esperimenti)]:
+            tabella.to_excel(excel, sheet_name=nome, index=False)
+            foglio = excel.sheets[nome]
+            foglio.freeze_panes = "A2"
+            for colonna in foglio.columns:   # larghezza delle colonne in base al testo
+                foglio.column_dimensions[colonna[0].column_letter].width = max(len(str(c.value)) for c in colonna) + 2
+    print("Salvato:", file)
+
+
 def matrice(tabella, metrica="EER (%)"):
     """
     Tabella train x test: righe = modello, dataset di train e augmentation; colonne = liste di test.

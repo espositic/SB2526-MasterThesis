@@ -9,3 +9,4 @@ tqdm
 matplotlib
 imageio-ffmpeg   # ffmpeg per l'augmentation con i codec
 ipykernel        # per usare i notebook in VS Code
+openpyxl         # per salvare la tabella Excel dei risultati
