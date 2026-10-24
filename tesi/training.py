@@ -90,6 +90,8 @@ def carica_pesi(modello, file):
     del modello SSL, che il training non usa (il masking è spento).
     """
     pesi = torch.load(file, map_location="cpu", weights_only=True)
+    # Nes2Net-X del codice vecchio: i blocchi si chiamavano "blocks"
+    pesi = {k.replace("backend.blocks.", "backend.blocchi."): v for k, v in pesi.items()}
     risultato = modello.load_state_dict(pesi, strict=False)
     diversi = [k for k in risultato.missing_keys + risultato.unexpected_keys if "masked_spec_embed" not in k]
     if diversi:

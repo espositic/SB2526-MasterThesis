@@ -205,9 +205,28 @@ def file_mancanti(lista):
 # Audio e Dataset PyTorch
 # ---------------------------------------------------------------------------
 
+def leggi_con_ffmpeg(file):
+    """Decodifica con ffmpeg (imageio-ffmpeg) in float32 mono a 16 kHz."""
+    import os
+    import subprocess
+
+    import imageio_ffmpeg
+
+    opzioni = {"capture_output": True, "check": True}
+    if os.name == "nt":
+        opzioni["creationflags"] = subprocess.CREATE_NO_WINDOW   # niente finestre nere su Windows
+    uscita = subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), "-loglevel", "error", "-i", str(file),
+                             "-f", "f32le", "-ar", str(FREQ), "-ac", "1", "pipe:1"], **opzioni).stdout
+    return np.frombuffer(uscita, dtype=np.float32).copy(), FREQ
+
+
 def leggi_audio(percorso):
     """Legge una clip come array float32 mono a 16 kHz."""
-    wave, freq = sf.read(percorsi.DATI / percorso, dtype="float32")
+    try:
+        wave, freq = sf.read(percorsi.DATI / percorso, dtype="float32")
+    except sf.LibsndfileError:
+        # molti FLAC di ASVspoof 2021 usano una codifica che libsndfile non legge: li decodifica ffmpeg
+        wave, freq = leggi_con_ffmpeg(percorsi.DATI / percorso)
     if wave.ndim > 1:
         wave = wave.mean(axis=1)
     if freq != FREQ:
