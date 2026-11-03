@@ -19,6 +19,7 @@ notebooks/
   02_training           training di un modello (scelta di modello, dataset, augmentation, seed)
   03_test               punteggi sulle liste di test
   04_risultati          tabelle e grafici
+backend.py              backend FastAPI: un file audio in ingresso, punteggio bonafide/spoof in uscita
 manifests/              liste di file (CSV), committate per poter rifare gli esperimenti
 data/                   dataset                         (non in git)
 artifacts/esperimenti/  pesi, log e punteggi di ogni esperimento   (non in git)
