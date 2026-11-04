@@ -1,15 +1,17 @@
 # Replica della Tabella 3 di XLSR-MamBo (Sez. 5.3 del paper) con i 4 modelli della tesi.
 #
-# Il paper allena su ASVspoof 2019 LA due modelli diversi (Sez. 4.2):
-#   - modello "LA": RawBoost algoritmo 5 (LnL + ISD), testato su 2021 LA
-#   - modello "DF": RawBoost algoritmo 3 (SSI), testato su 2021 DF
-# Noi in più testiamo il modello LA su 2019 LA eval, In-the-Wild e ASVspoof 5 eval completo.
+# Protocollo del paper: training su ASVspoof 2019 LA intero con RawBoost algoritmo 5 (LnL + ISD),
+# test senza riallenare su 2019 LA eval, 2021 LA, 2021 DF e In-the-Wild. Noi in più testiamo
+# su ASVspoof 5 eval completo e alleniamo anche su ASVspoof 5 intero (stessa ricetta).
+# (Il paper usa un secondo modello con RawBoost algoritmo 3 per il 2021 DF: noi no, lo dichiariamo.)
 #
 # Il lavoro è diviso in due parti, che possono girare nello stesso momento:
-#   python coda_tabella3.py fisso   modello LA di TFPARN (gli altri 3 sono già fatti) e test su ASVspoof 5
-#   python coda_tabella3.py colab   i 4 modelli DF (RawBoost SSI) e il loro test su 2021 DF
+#   python coda_tabella3.py fisso           TFPARN su 2019 LA (gli altri 3 sono già fatti) e test su ASVspoof 5
+#   python coda_tabella3.py colab [modelli] training su ASVspoof 5 intero (di default solo MamBo),
+#                                           da notebooks/05_colab.ipynb; i test si fanno poi sul fisso
 # I passi già fatti vengono saltati, quindi se si interrompe basta rilanciare lo stesso comando.
 # Se un passo va in errore si passa al successivo, senza ritentare.
+import os
 import sys
 import traceback
 
@@ -31,14 +33,17 @@ def prepara_lista(nome):
         "asvspoof2021df_eval": lambda: dati.lista_asvspoof2021("DF"),
         "inthewild": dati.lista_in_the_wild,
         "asvspoof5_eval_completo": lambda: dati.lista_asvspoof5("eval"),
+        # train intero di ASVspoof 5; per scegliere l'epoca si usa lo stesso dev da 5.000 clip di sempre
+        "asvspoof5intero_train": lambda: dati.lista_asvspoof5("train"),
+        "asvspoof5intero_dev": lambda: dati.carica_lista("asvspoof5_dev"),
     }
     dati.salva_lista(crea[nome](), nome)
 
 
-def allena(modello, augmentation):
-    print(f"== training {modello} su asvspoof2019 con {augmentation}, seed 1")
+def allena(modello, augmentation, dataset="asvspoof2019", num_workers=4):
+    print(f"== training {modello} su {dataset} con {augmentation}, seed 1")
     try:
-        return training.addestra(modello, "asvspoof2019", augmentation, seed=1)
+        return training.addestra(modello, dataset, augmentation, seed=1, num_workers=num_workers)
     except Exception:
         traceback.print_exc()
         print(f"ERRORE nel training di {modello}: passo al successivo")
@@ -68,18 +73,24 @@ def parte_fisso():
         testa_e_stampa(cartella, "asvspoof5_eval_completo")
 
 
-def parte_colab():
-    # modelli DF (RawBoost algoritmo 3), ciascuno testato subito su 2021 DF
-    for m in MODELLI:
-        testa_e_stampa(allena(m, "rawboost_ssi"), "asvspoof2021df_eval")
+def parte_colab(modelli):
+    # training su ASVspoof 5 intero (circa 180.000 clip), uno dopo l'altro
+    prepara_lista("asvspoof5intero_train")
+    prepara_lista("asvspoof5intero_dev")
+    for m in modelli:
+        # su Colab ci sono più CPU: più worker, perché RawBoost gira sulla CPU
+        allena(m, "rawboost", dataset="asvspoof5intero", num_workers=min(8, os.cpu_count()))
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2 or sys.argv[1] not in ("fisso", "colab"):
-        sys.exit("uso: python coda_tabella3.py fisso   oppure   python coda_tabella3.py colab")
+    if len(sys.argv) < 2 or sys.argv[1] not in ("fisso", "colab"):
+        sys.exit("uso: python coda_tabella3.py fisso   oppure   python coda_tabella3.py colab [mambo nes2net ...]")
     if sys.platform == "win32":
         import ctypes
         # impedisce a Windows di andare in sospensione finché lo script gira
         ctypes.windll.kernel32.SetThreadExecutionState(0x80000001)
-    parte_fisso() if sys.argv[1] == "fisso" else parte_colab()
+    if sys.argv[1] == "fisso":
+        parte_fisso()
+    else:
+        parte_colab(sys.argv[2:] or ["mambo"])
     print("Tutto finito.")

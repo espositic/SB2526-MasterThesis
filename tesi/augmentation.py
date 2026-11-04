@@ -3,8 +3,6 @@
 # Le quattro condizioni da confrontare:
 #   "nessuna"   nessuna augmentation
 #   "rawboost"  RawBoost, algoritmo 5 (Tak et al., ICASSP 2022), su ogni clip
-#   "rawboost_ssi"  RawBoost, algoritmo 3 (rumore colorato), su ogni clip: è quello che
-#               XLSR-MamBo usa per il modello testato su ASVspoof 2021 DF (Sez. 4.2 del paper)
 #   "rumore"    rumore, parlato o musica di MUSAN oppure riverbero (RIR), su metà delle clip
 #   "codec"     compressione MP3, AAC oppure Opus con ffmpeg, su metà delle clip
 # Per TFPARN c'è anche SpecAugment, che però lavora sullo spettrogramma ed è dentro il modello.
@@ -30,8 +28,6 @@ def crea_augmentation(nome):
         return None
     if nome == "rawboost":
         return RawBoost()
-    if nome == "rawboost_ssi":
-        return RawBoostSSI()
     if nome == "rumore":
         return RumoreRiverbero()
     if nome == "codec":
@@ -102,26 +98,6 @@ class RawBoost:
         f_r = (2 * rng.random(n) - 1) * (2 * rng.random(n) - 1)
         y[idx] = x[idx] + self.g_sd * x[idx] * f_r
         return normalizza(y)
-
-
-class RawBoostSSI(RawBoost):
-    """
-    RawBoost algoritmo 3: rumore stazionario indipendente dal segnale (SSI).
-    Rumore bianco filtrato con la stessa cascata di filtri, sommato alla clip con un SNR
-    casuale tra 10 e 40 dB (default dell'originale).
-    """
-    snr_min, snr_max = 10, 40
-
-    def trasforma(self, wave, rng):
-        x = wave.astype(np.float64)
-        rumore = rng.normal(0, 1, len(x))
-        b = self.filtro_notch(self.min_g, self.max_g, rng)
-        rumore = applica_fir(rumore, b)[: len(x)]
-        rumore = rumore / np.max(np.abs(rumore))
-        snr = rng.uniform(self.snr_min, self.snr_max)
-        # scala il rumore in modo che il rapporto tra le energie sia proprio snr dB
-        rumore = rumore * np.linalg.norm(x) / np.linalg.norm(rumore) * 10 ** (-snr / 20)
-        return (x + rumore).astype(np.float32)
 
 
 def applica_fir(x, b):
