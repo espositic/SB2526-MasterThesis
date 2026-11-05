@@ -7,8 +7,9 @@
 #
 # Il lavoro è diviso in due parti, che possono girare nello stesso momento:
 #   python coda_tabella3.py fisso           TFPARN su 2019 LA (gli altri 3 sono già fatti) e test su ASVspoof 5
-#   python coda_tabella3.py colab [modelli] training su ASVspoof 5 intero (di default solo MamBo),
-#                                           da notebooks/05_colab.ipynb; i test si fanno poi sul fisso
+#   python coda_tabella3.py asvspoof5 [modelli]  training su ASVspoof 5 intero (di default solo MamBo),
+#                                                su Colab (notebooks/05_colab.ipynb) o sul fisso; i test si fanno poi sul fisso
+#                                                ("colab" è un altro nome per la stessa parte)
 # I passi già fatti vengono saltati, quindi se si interrompe basta rilanciare lo stesso comando.
 # Se un passo va in errore si passa al successivo, senza ritentare.
 import os
@@ -78,13 +79,13 @@ def parte_colab(modelli):
     prepara_lista("asvspoof5intero_train")
     prepara_lista("asvspoof5intero_dev")
     for m in modelli:
-        # su Colab ci sono più CPU: più worker, perché RawBoost gira sulla CPU
+        # più worker se ci sono più CPU (Colab), perché RawBoost gira sulla CPU
         allena(m, "rawboost", dataset="asvspoof5intero", num_workers=min(8, os.cpu_count()))
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2 or sys.argv[1] not in ("fisso", "colab"):
-        sys.exit("uso: python coda_tabella3.py fisso   oppure   python coda_tabella3.py colab [mambo nes2net ...]")
+    if len(sys.argv) < 2 or sys.argv[1] not in ("fisso", "asvspoof5", "colab"):
+        sys.exit("uso: python coda_tabella3.py fisso   oppure   python coda_tabella3.py asvspoof5 [mambo nes2net ...]")
     if sys.platform == "win32":
         import ctypes
         # impedisce a Windows di andare in sospensione finché lo script gira
