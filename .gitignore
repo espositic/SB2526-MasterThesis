@@ -37,3 +37,11 @@ build/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# liste intere (fino a 44 MB l'una): le rifà prepara_lista() di coda_tabella3.py dai protocolli ufficiali
+manifests/asvspoof2019_eval.csv
+manifests/asvspoof2021la_eval.csv
+manifests/asvspoof2021df_eval.csv
+manifests/asvspoof5_eval_completo.csv
+manifests/asvspoof5intero_train.csv
+manifests/asvspoof5intero_dev.csv

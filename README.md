@@ -14,6 +14,7 @@ tesi/                   codice, importato dai notebook
   training.py           training con early stopping sul dev, test
   metriche.py           EER, minDCF, actDCF, Cllr, EER per attacco
   risultati.py          tabelle dei risultati
+  baseline_ssl.py       medie sul tempo dei layer di un SSL congelato (feature per i classificatori leggeri)
 notebooks/
   01_preparazione_dati  download dei dataset e creazione delle liste
   02_training           training di un modello (scelta di modello, dataset, augmentation, seed)
@@ -21,6 +22,10 @@ notebooks/
   04_risultati          tabelle e grafici
   05_colab              training su ASVspoof 5 intero su Google Colab
 coda_tabella3.py        replica della Tabella 3 di XLSR-MamBo (parte "fisso" e parte "colab")
+estrai_feature_ssl.py   estrae le feature SSL congelate (WavLM Base, HuBERT Base, XLS-R) sulla GPU
+classificatori_leggeri.py  classificatori di scikit-learn sulle feature SSL, solo CPU
+crea_excel.py           raccoglie i risultati dei classificatori leggeri in un Excel
+risultati/              tabelle dei classificatori leggeri (copia di artifacts/classificatori_leggeri)
 manifests/              liste di file (CSV), committate per poter rifare gli esperimenti
 data/                   dataset                         (non in git)
 artifacts/esperimenti/  pesi, log e punteggi di ogni esperimento   (non in git)
@@ -52,6 +57,16 @@ massimo 20 epoche, stop dopo 3 epoche senza miglioramenti dell'EER sul dev, 3 se
 Le eccezioni (MHFA e TFPARN) sono in `tesi/modelli/__init__.py`.
 
 Ogni esperimento finisce in `artifacts/esperimenti/<modello>_<dataset>_<augmentation>/seed<k>/`.
+
+### Classificatori leggeri su feature SSL congelate
+
+Stesso protocollo della Tabella 3 (training su 2019 LA train, scelte su 2019 LA dev, test su
+2019 LA eval, 2021 LA e DF, In-the-Wild e ASVspoof 5 eval completo), ma senza fine-tuning:
+`python estrai_feature_ssl.py` salva sulla GPU le medie sul tempo di ogni layer
+(`artifacts/feature_ssl/<ssl>/`), poi `python classificatori_leggeri.py <ssl>` sceglie il layer sul dev
+e confronta 24 classificatori (lineari, alberi, kernel, probabilistici, MLP, ensemble, somma pesata
+dei layer, configurazione di Pascu et al. 2023) solo sulla CPU. Salva tabelle, modelli e punteggi
+per clip in `artifacts/classificatori_leggeri/<ssl>/`; `python crea_excel.py` fa l'Excel di riepilogo.
 
 ### Replica della Tabella 3 di XLSR-MamBo
 
