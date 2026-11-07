@@ -14,7 +14,8 @@ from openpyxl.utils import get_column_letter
 from tesi import percorsi
 
 CARTELLA = percorsi.PROGETTO / "artifacts" / "classificatori_leggeri"
-SSL = {"wavlm-base": "WavLM Base", "hubert-base-ls960": "HuBERT Base", "wav2vec2-xls-r-300m": "XLS-R 300M"}
+SSL = {"wavlm-base": "WavLM Base", "hubert-base-ls960": "HuBERT Base", "wav2vec2-xls-r-300m": "XLS-R 300M",
+       "wavlm-large": "WavLM Large", "hubert-large-ll60k": "HuBERT Large"}
 # cartella dei risultati = <ssl><suffisso>; nome breve del training per i fogli
 TRAINING = {"": ("2019 LA", ""), "_train-asvspoof5intero_train": ("ASVspoof 5 intero", " train ASV5")}
 LISTE = {"EER dev (%)": "dev", "inthewild EER (%)": "In-the-Wild", "asvspoof2019_eval EER (%)": "2019 LA eval",

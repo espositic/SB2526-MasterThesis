@@ -93,6 +93,64 @@ Scelte sul dev della lista di training, test sulle stesse liste, punteggio alto 
 | Somma pesata dei layer + MLP | multi-layer | 0.00 | 22.13 | 0.27 | 8.69 | 8.94 | 16.44 |
 | Regressione logistica (Pascu: ultimo layer, C=1e6) | lineare | 0.16 | 21.58 | 1.05 | 9.90 | 8.41 | 14.59 |
 
+## WavLM Large (layer 1)
+
+| classificatore | famiglia | dev | In-the-Wild | 2019 LA eval | 2021 LA | 2021 DF | ASVspoof 5 |
+|---|---|---|---|---|---|---|---|
+| Regressione logistica | lineare | 0.11 | 44.52 | 4.78 | 33.61 | 29.32 | 38.83 |
+| SVM lineare | lineare | 0.03 | 51.90 | 4.42 | 33.63 | 29.46 | 38.03 |
+| LDA | lineare | 0.00 | 51.13 | 2.84 | 19.17 | 24.69 | 38.89 |
+| Albero di decisione | alberi | 15.97 | 49.48 | 12.48 | 42.18 | 37.39 | 49.99 |
+| Random forest | alberi | 1.22 | 27.70 | 5.64 | 15.42 | 23.01 | 42.86 |
+| Extra trees | alberi | 1.34 | 28.93 | 5.90 | 15.47 | 22.40 | 42.02 |
+| Gradient boosting | alberi | 0.66 | 31.98 | 4.57 | 22.37 | 23.41 | 39.73 |
+| XGBoost | alberi | 0.59 | 32.23 | 4.95 | 25.30 | 25.20 | 40.62 |
+| AdaBoost | alberi | 0.51 | 35.11 | 5.36 | 28.22 | 28.10 | 40.76 |
+| kNN (PCA 128) | vicini | 26.53 | 46.75 | 11.81 | 19.46 | 26.47 | 44.59 |
+| Naive Bayes gaussiano | probabilistico | 14.72 | 50.04 | 12.60 | 40.54 | 36.38 | 49.90 |
+| QDA (PCA 128) | probabilistico | 4.75 | 29.04 | 3.30 | 28.70 | 26.57 | 39.88 |
+| SVM RBF (Nystroem 2000) | kernel | 0.27 | 42.47 | 3.48 | 25.94 | 27.58 | 42.92 |
+| SVM RBF (esatta) | kernel | 0.04 | 44.73 | 3.70 | 29.28 | 29.27 | 44.09 |
+| MLP (256) | rete | 0.08 | 33.00 | 5.14 | 27.87 | 31.00 | 39.61 |
+| Due GMM (PCA 128, LLR) | probabilistico | 14.95 | 31.51 | 18.19 | 29.16 | 31.44 | 36.38 |
+| Regressione logistica (C sul dev) | lineare | 0.04 | 38.60 | 4.57 | 31.92 | 30.61 | 37.49 |
+| Voting (RF + GB + SVM lineare) | ensemble | 0.03 | 43.57 | 3.21 | 28.22 | 26.82 | 37.33 |
+| SelectKBest + regressione logistica | selezione feature | 0.19 | 35.41 | 5.49 | 29.74 | 29.79 | 37.90 |
+| Regressione logistica (sottocampionata) | campionamento | 0.12 | 33.14 | 5.02 | 32.82 | 31.72 | 38.09 |
+| Random forest (sottocampionata) | campionamento | 1.70 | 28.32 | 5.93 | 15.50 | 21.99 | 41.14 |
+| Regressione logistica (3 layer) | multi-layer | 0.08 | 34.37 | 1.90 | 24.07 | 21.60 | 33.43 |
+| Somma pesata dei layer + MLP | multi-layer | 0.04 | 21.39 | 0.34 | 7.30 | 9.23 | 17.00 |
+| Regressione logistica (Pascu: ultimo layer, C=1e6) | lineare | 0.98 | 19.62 | 2.28 | 10.50 | 7.58 | 18.94 |
+
+## HuBERT Large (layer 11)
+
+| classificatore | famiglia | dev | In-the-Wild | 2019 LA eval | 2021 LA | 2021 DF | ASVspoof 5 |
+|---|---|---|---|---|---|---|---|
+| Regressione logistica | lineare | 0.12 | 24.35 | 0.84 | 10.37 | 9.50 | 22.54 |
+| SVM lineare | lineare | 0.16 | 23.99 | 0.65 | 10.83 | 8.85 | 22.96 |
+| LDA | lineare | 0.12 | 23.85 | 0.55 | 8.38 | 8.20 | 22.75 |
+| Albero di decisione | alberi | 16.29 | 45.40 | 9.90 | 27.51 | 31.43 | 46.64 |
+| Random forest | alberi | 1.54 | 17.77 | 3.10 | 6.94 | 8.08 | 15.37 |
+| Extra trees | alberi | 1.30 | 19.07 | 3.17 | 6.46 | 8.33 | 15.96 |
+| Gradient boosting | alberi | 0.47 | 18.87 | 1.62 | 7.91 | 7.73 | 16.59 |
+| XGBoost | alberi | 0.83 | 18.36 | 1.69 | 9.36 | 7.02 | 16.89 |
+| AdaBoost | alberi | 0.67 | 21.39 | 1.47 | 6.28 | 9.48 | 20.25 |
+| kNN (PCA 128) | vicini | 25.51 | 36.15 | 4.54 | 10.40 | 17.18 | 36.08 |
+| Naive Bayes gaussiano | probabilistico | 16.48 | 49.87 | 10.81 | 15.23 | 32.82 | 49.63 |
+| QDA (PCA 128) | probabilistico | 2.35 | 17.58 | 2.04 | 10.14 | 8.27 | 16.73 |
+| SVM RBF (Nystroem 2000) | kernel | 0.27 | 16.33 | 0.68 | 8.17 | 5.56 | 21.15 |
+| SVM RBF (esatta) | kernel | 0.04 | 15.00 | 0.51 | 7.28 | 6.58 | 21.92 |
+| MLP (256) | rete | 0.12 | 16.70 | 0.66 | 4.71 | 11.03 | 20.27 |
+| Due GMM (PCA 128, LLR) | probabilistico | 9.26 | 44.24 | 8.33 | 13.51 | 19.95 | 32.45 |
+| Regressione logistica (C sul dev) | lineare | 0.12 | 24.35 | 0.84 | 10.37 | 9.50 | 22.54 |
+| Voting (RF + GB + SVM lineare) | ensemble | 0.15 | 17.08 | 0.57 | 6.89 | 5.98 | 18.17 |
+| SelectKBest + regressione logistica | selezione feature | 0.71 | 19.57 | 1.18 | 13.88 | 8.91 | 20.61 |
+| Regressione logistica (sottocampionata) | campionamento | 0.27 | 17.51 | 0.91 | 10.19 | 8.02 | 19.82 |
+| Random forest (sottocampionata) | campionamento | 3.22 | 18.07 | 3.51 | 7.41 | 7.84 | 14.67 |
+| Regressione logistica (3 layer) | multi-layer | 0.16 | 32.36 | 0.71 | 15.57 | 11.18 | 31.84 |
+| Somma pesata dei layer + MLP | multi-layer | 0.04 | 17.03 | 1.09 | 9.44 | 11.45 | 24.37 |
+| Regressione logistica (Pascu: ultimo layer, C=1e6) | lineare | 0.67 | 18.60 | 2.96 | 12.07 | 9.03 | 21.42 |
+
 # Training su ASVspoof 5 intero
 
 
