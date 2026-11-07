@@ -1,0 +1,27 @@
+classificatore,file,layer
+Regressione logistica,regressione_logistica.joblib,12
+SVM lineare,svm_lineare.joblib,12
+LDA,lda.joblib,12
+Albero di decisione,albero_di_decisione.joblib,12
+Random forest,random_forest.joblib,12
+Extra trees,extra_trees.joblib,12
+Gradient boosting,gradient_boosting.joblib,12
+XGBoost,xgboost.joblib,12
+AdaBoost,adaboost.joblib,12
+kNN (PCA 128),knn_pca_128.joblib,12
+Naive Bayes gaussiano,naive_bayes_gaussiano.joblib,12
+QDA (PCA 128),qda_pca_128.joblib,12
+SVM RBF (Nystroem 2000),svm_rbf_nystroem_2000.joblib,12
+SVM RBF (esatta),svm_rbf_esatta.joblib,12
+MLP (256),mlp_256.joblib,12
+"Due GMM (PCA 128, LLR)",due_gmm_pca_128_llr.joblib,12
+Regressione logistica (C sul dev),regressione_logistica_c_sul_dev.joblib,12
+Voting (RF + GB + SVM lineare),voting_rf_gb_svm_lineare.joblib,12
+Isolation forest (solo bonafide),isolation_forest_solo_bonafide.joblib,12
+"One-class SVM (Nystroem, solo bonafide)",one_class_svm_nystroem_solo_bonafide.joblib,12
+SelectKBest + regressione logistica,selectkbest_regressione_logistica.joblib,12
+Regressione logistica (sottocampionata),regressione_logistica_sottocampionata.joblib,12
+Random forest (sottocampionata),random_forest_sottocampionata.joblib,12
+Regressione logistica (3 layer),regressione_logistica_3_layer.joblib,"[12, 11, 13]"
+Somma pesata dei layer + MLP,somma_pesata_dei_layer_mlp.pt,"[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]"
+"Regressione logistica (Pascu: ultimo layer, C=1e6)",regressione_logistica_pascu_ultimo_layer_c_1e6.joblib,24

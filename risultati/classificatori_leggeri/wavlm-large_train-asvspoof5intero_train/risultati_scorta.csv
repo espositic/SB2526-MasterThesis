@@ -1,0 +1,3 @@
+classificatore,famiglia,layer,scelta dev,minuti training,EER dev (%),inthewild EER (%),inthewild minDCF,asvspoof2019_eval EER (%),asvspoof2019_eval minDCF,asvspoof2021la_eval EER (%),asvspoof2021la_eval minDCF,asvspoof2021df_eval EER (%),asvspoof2021df_eval minDCF,asvspoof5_eval_completo EER (%),asvspoof5_eval_completo minDCF
+Isolation forest (solo bonafide),anomaly,12,-,0.01,31.599999999999994,57.92180920620549,1.0,58.85743739663104,1.0,55.40749288047358,1.0,50.486783608168665,1.0,32.08067225082715,0.7956494117752727
+"One-class SVM (Nystroem, solo bonafide)",anomaly,12,-,0.09,28.680000000000007,57.708321201602786,1.0,52.140641658499746,1.0,49.73003779373715,1.0,47.192137552518346,1.0,29.748057481391577,0.7510880900574499
