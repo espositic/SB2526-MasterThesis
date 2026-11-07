@@ -1,0 +1,41 @@
+lista,sistema,EER (%),IC 2.5%,IC 97.5%,"diff. dal primo, IC",significativa
+In-the-Wild,WavLM Large · SVM lineare (migliore su questa lista),10.198452233110606,9.808208473802804,10.554006335213714,"[+0.00, +0.00]",-
+In-the-Wild,WavLM Base · Somma pesata dei layer + MLP (miglior media),12.905050502875143,12.48308376081397,13.322954099096535,"[+2.28, +3.12]",sì
+In-the-Wild,HuBERT Base · Voting (RF + GB + SVM lineare) (miglior media),18.600652320537066,18.146668959443627,19.091536336128407,"[+7.95, +8.92]",sì
+In-the-Wild,XLS-R 300M · Somma pesata dei layer + MLP (miglior media),14.41466581998634,13.971544404584163,14.868649181079785,"[+3.82, +4.67]",sì
+In-the-Wild,WavLM Large · Voting (RF + GB + SVM lineare) (miglior media),10.62965979275607,10.305891289245636,11.02640871563645,"[+0.19, +0.74]",sì
+In-the-Wild,HuBERT Large · Voting (RF + GB + SVM lineare) (miglior media),15.29305794087376,14.887068200409079,15.731001684531412,"[+4.67, +5.54]",sì
+In-the-Wild,MamBo (fine-tuning + RawBoost),18.873816781085633,18.534008660139406,19.47481289098441,"[+8.24, +9.34]",sì
+In-the-Wild,MHFA (fine-tuning + RawBoost),19.76144971955735,19.311760524743285,20.268373352584472,"[+9.08, +10.15]",sì
+2019 LA eval,WavLM Large · Extra trees (migliore su questa lista),7.886103778484682,7.627717315135608,8.183630030947398,"[+0.00, +0.00]",-
+2019 LA eval,WavLM Base · Somma pesata dei layer + MLP (miglior media),18.50442440281901,18.16122902746994,18.792191738800536,"[+10.21, +10.94]",sì
+2019 LA eval,HuBERT Base · Voting (RF + GB + SVM lineare) (miglior media),14.017071456803714,13.745644919525851,14.278719510273136,"[+5.78, +6.43]",sì
+2019 LA eval,XLS-R 300M · Somma pesata dei layer + MLP (miglior media),14.696665084679516,14.384533372107239,14.98267751473969,"[+6.42, +7.12]",sì
+2019 LA eval,WavLM Large · Voting (RF + GB + SVM lineare) (miglior media),11.855274950239128,11.600058393906115,12.169963829150412,"[+3.67, +4.27]",sì
+2019 LA eval,HuBERT Large · Voting (RF + GB + SVM lineare) (miglior media),11.11038311608306,10.835884508425424,11.393245206454433,"[+2.88, +3.51]",sì
+2019 LA eval,MamBo (fine-tuning + RawBoost),23.905125274418797,23.632133350960157,24.568528488677,"[+15.68, +16.73]",sì
+2019 LA eval,MHFA (fine-tuning + RawBoost),22.053092833828075,21.712493759472526,22.49975399174008,"[+13.76, +14.67]",sì
+2021 LA,HuBERT Large · Random forest (migliore su questa lista),9.103350631169663,8.901516338875854,9.314089787334106,"[+0.00, +0.00]",-
+2021 LA,WavLM Base · Somma pesata dei layer + MLP (miglior media),20.80958659779923,20.519714658580163,21.05821435604887,"[+11.40, +11.98]",sì
+2021 LA,HuBERT Base · Voting (RF + GB + SVM lineare) (miglior media),15.070640164623661,14.854520419485215,15.308000616399397,"[+5.72, +6.24]",sì
+2021 LA,XLS-R 300M · Somma pesata dei layer + MLP (miglior media),14.23450717523882,14.010551092400307,14.450505059625227,"[+4.87, +5.41]",sì
+2021 LA,WavLM Large · Voting (RF + GB + SVM lineare) (miglior media),11.709610696651167,11.487641726514308,11.9252242828972,"[+2.34, +2.87]",sì
+2021 LA,HuBERT Large · Voting (RF + GB + SVM lineare) (miglior media),12.047813304509724,11.812693029698593,12.26905117086734,"[+2.71, +3.17]",sì
+2021 LA,MamBo (fine-tuning + RawBoost),26.283820179808526,26.0798488250514,26.768421177400587,"[+16.93, +17.68]",sì
+2021 LA,MHFA (fine-tuning + RawBoost),28.603245603579065,28.306887046591765,28.94871279861198,"[+19.16, +19.88]",sì
+2021 DF,WavLM Large · Voting (RF + GB + SVM lineare) (migliore su questa lista),9.247658251050625,9.037441721699421,9.45704394999527,"[+0.00, +0.00]",-
+2021 DF,WavLM Base · Somma pesata dei layer + MLP (miglior media),17.149827770550267,16.915265502649568,17.42691656639817,"[+7.67, +8.20]",sì
+2021 DF,HuBERT Base · Voting (RF + GB + SVM lineare) (miglior media),16.26197474529364,15.992833870929715,16.51758485271288,"[+6.74, +7.30]",sì
+2021 DF,XLS-R 300M · Somma pesata dei layer + MLP (miglior media),13.537133692719665,13.282961283134389,13.753790827422302,"[+4.01, +4.54]",sì
+2021 DF,WavLM Large · Voting (RF + GB + SVM lineare) (miglior media),9.247658251050625,9.037441721699421,9.45704394999527,"[+0.00, +0.00]",no
+2021 DF,HuBERT Large · Voting (RF + GB + SVM lineare) (miglior media),10.464715795831973,10.261630806782637,10.693406014163068,"[+1.00, +1.44]",sì
+2021 DF,MamBo (fine-tuning + RawBoost),15.495915048340562,15.334660616260166,15.782982949358894,"[+6.05, +6.62]",sì
+2021 DF,MHFA (fine-tuning + RawBoost),16.882001555992726,16.68034441234139,17.116156837404418,"[+7.36, +7.91]",sì
+ASVspoof 5,WavLM Large · Regressione logistica (3 layer) (migliore su questa lista),5.587333447537916,5.5144692101344654,5.667294253587707,"[+0.00, +0.00]",-
+ASVspoof 5,WavLM Base · Somma pesata dei layer + MLP (miglior media),11.56250811536738,11.463112489027916,11.65004930938694,"[+5.87, +6.07]",sì
+ASVspoof 5,HuBERT Base · Voting (RF + GB + SVM lineare) (miglior media),15.104233996779854,15.003458048662473,15.195316662697172,"[+9.40, +9.62]",sì
+ASVspoof 5,XLS-R 300M · Somma pesata dei layer + MLP (miglior media),6.332931708343597,6.254144113609981,6.406520800539845,"[+0.67, +0.82]",sì
+ASVspoof 5,WavLM Large · Voting (RF + GB + SVM lineare) (miglior media),5.694095433663872,5.619668707815233,5.764771271245837,"[+0.04, +0.17]",sì
+ASVspoof 5,HuBERT Large · Voting (RF + GB + SVM lineare) (miglior media),8.864481117887829,8.78153411056304,8.941116786130317,"[+3.19, +3.36]",sì
+ASVspoof 5,MamBo (fine-tuning + RawBoost),4.6686923993324685,4.610235327404976,4.7508392992965645,"[-0.98, -0.83]",sì
+ASVspoof 5,MHFA (fine-tuning + RawBoost),6.575265399733059,6.5025093293748375,6.6517882891159585,"[+0.90, +1.07]",sì

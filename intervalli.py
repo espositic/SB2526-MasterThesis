@@ -4,12 +4,15 @@
 # stessi indici ricampionati per i due sistemi, la differenza è significativa se l'intervallo non
 # contiene lo 0.
 #
-#   python intervalli.py          (n = 1000 ricampionamenti)
+#   python intervalli.py          training su 2019 LA (n = 1000 ricampionamenti)
+#   python intervalli.py asv5     training su ASVspoof 5 intero (leggeri e fine-tunati allenati lì)
 #
 # Leggeri: per ogni SSL il classificatore con l'EER medio più basso sui 5 test, più il migliore di
 # ogni lista (scelto guardando il test: è ottimistico, va detto). Fine-tunati: punteggi_<lista>.csv
 # copiati dal fisso in artifacts/punteggi_finetunati/<esperimento>/.
-# Risultato in artifacts/classificatori_leggeri/intervalli.csv e intervalli.md.
+# Risultato in artifacts/classificatori_leggeri/intervalli<_train-asv5>.csv e .md.
+import sys
+
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
@@ -17,8 +20,11 @@ from joblib import Parallel, delayed
 from tesi import metriche, percorsi
 
 CARTELLA = percorsi.PROGETTO / "artifacts" / "classificatori_leggeri"
-FINETUNATI = {"MamBo": "mambo_asvspoof2019_rawboost", "Nes2Net-X": "nes2net_asvspoof2019_rawboost",
-              "MHFA": "mhfa_asvspoof2019_rawboost"}
+ASV5 = len(sys.argv) > 1 and sys.argv[1] == "asv5"
+SUFFISSO = "_train-asvspoof5intero_train" if ASV5 else ""   # cartella dei leggeri: <ssl><SUFFISSO>
+FINETUNATI = ({"MamBo": "mambo_asvspoof5intero_rawboost", "MHFA": "mhfa_asvspoof5intero_rawboost"} if ASV5 else
+              {"MamBo": "mambo_asvspoof2019_rawboost", "Nes2Net-X": "nes2net_asvspoof2019_rawboost",
+               "MHFA": "mhfa_asvspoof2019_rawboost"})
 SSL = {"wavlm-base": "WavLM Base", "hubert-base-ls960": "HuBERT Base", "wav2vec2-xls-r-300m": "XLS-R 300M",
        "wavlm-large": "WavLM Large", "hubert-large-ll60k": "HuBERT Large"}
 LISTE = {"inthewild": "In-the-Wild", "asvspoof2019_eval": "2019 LA eval", "asvspoof2021la_eval": "2021 LA",
@@ -59,7 +65,7 @@ def sistemi_lista(lista, migliori_media):
     # il migliore leggero su questa lista (per EER) va per primo: è quello con cui si confrontano gli altri
     candidati = []
     for ssl, nome_ssl in SSL.items():
-        file = CARTELLA / ssl / "punteggi" / f"{lista}.npz"
+        file = CARTELLA / (ssl + SUFFISSO) / "punteggi" / f"{lista}.npz"
         if not file.exists():
             continue
         d = np.load(file)
@@ -86,7 +92,7 @@ if __name__ == "__main__":
     # per ogni SSL, il classificatore con l'EER medio più basso sui 5 test
     migliori_media = {}
     for ssl in SSL:
-        df = pd.read_csv(CARTELLA / ssl / "risultati.csv")
+        df = pd.read_csv(CARTELLA / (ssl + SUFFISSO) / "risultati.csv")
         colonne = [f"{l} EER (%)" for l in LISTE]
         migliori_media[ssl] = df.loc[df[colonne].mean(axis=1).idxmin(), "classificatore"]
     print("miglior media per SSL:", migliori_media)
@@ -102,14 +108,15 @@ if __name__ == "__main__":
     risultati = Parallel(n_jobs=len(LISTE))(delayed(una_lista)(l) for l in LISTE)
     df = pd.DataFrame([r for righe in risultati for r in righe])
     df = df[["lista", "sistema", "EER (%)", "IC 2.5%", "IC 97.5%", "diff. dal primo, IC", "significativa"]]
-    df.to_csv(CARTELLA / "intervalli.csv", index=False)
+    nome = "intervalli" + ("_train-asv5" if ASV5 else "")
+    df.to_csv(CARTELLA / f"{nome}.csv", index=False)
     testo = ["# Intervalli di confidenza al 95% dell'EER (bootstrap, 1000 ricampionamenti per classe)\n",
-             "Training su 2019 LA. Il primo sistema di ogni lista è il miglior leggero su quella lista (scelto "
+             f"Training su {'ASVspoof 5 intero' if ASV5 else '2019 LA'}. Il primo sistema di ogni lista è il miglior leggero su quella lista (scelto "
              "guardando il test, quindi ottimistico); la differenza è appaiata (stessi ricampionamenti).\n"]
     for lista, gruppo in df.groupby("lista", sort=False):
         testo.append(f"\n## {lista}\n\n| sistema | EER (%) | IC 95% | differenza dal primo (IC 95%) | significativa |\n|---|---|---|---|---|")
         for _, r in gruppo.iterrows():
             testo.append(f"| {r['sistema']} | {r['EER (%)']:.2f} | [{r['IC 2.5%']:.2f}, {r['IC 97.5%']:.2f}] | "
                          f"{r['diff. dal primo, IC']} | {r['significativa']} |")
-    (CARTELLA / "intervalli.md").write_text("\n".join(testo) + "\n", encoding="utf-8")
+    (CARTELLA / f"{nome}.md").write_text("\n".join(testo) + "\n", encoding="utf-8")
     print(df.round(2).to_string(index=False))

@@ -111,11 +111,21 @@ if __name__ == "__main__":
     fogli["Migliori per lista"] = pd.DataFrame(migliori).sort_values(["lista", "EER (%)"])
     fogli.update({"Scorta (anomaly)": pd.concat(altri["scorta"]), "Clustering": pd.concat(altri["clustering"]),
                   "Layer dev": pd.concat(altri["layer_dev"])})
+    # confronto con i fine-tunati e intervalli di confidenza, se intervalli.py è stato lanciato
+    for file, breve in [("intervalli.csv", "train 2019"), ("intervalli_train-asv5.csv", "train ASV5")]:
+        if (CARTELLA / file).exists():
+            iv = pd.read_csv(CARTELLA / file)
+            # nel confronto, il miglior leggero di ogni lista (diverso per lista) va su una riga sola
+            pv = iv.assign(sistema=iv["sistema"].where(~iv["sistema"].str.endswith("(migliore su questa lista)"),
+                                                       "Miglior leggero su ogni lista (scelto sul test)"))
+            fogli[f"Confronto {breve}"] = pv.pivot_table(index="sistema", columns="lista", values="EER (%)",
+                                                         sort=False).reset_index()
+            fogli[f"Intervalli {breve}"] = iv
     uscita = CARTELLA / "classificatori_leggeri.xlsx"
     with pd.ExcelWriter(uscita, engine="openpyxl") as excel:
         for titolo, df in fogli.items():
             df.to_excel(excel, sheet_name=titolo, index=False)
-            formatta(excel.sheets[titolo], df.reset_index(drop=True), titolo.startswith("Riepilogo") or "completo" in titolo
-                     or "train ASV5" in titolo)
+            formatta(excel.sheets[titolo], df.reset_index(drop=True), titolo.startswith(("Riepilogo", "Confronto")) or "completo" in titolo
+                     or ("train ASV5" in titolo and not titolo.startswith("Intervalli")))
     (CARTELLA / "riepilogo.md").write_text("\n".join(testo) + "\n", encoding="utf-8")
     print("Scritti", uscita, "e", CARTELLA / "riepilogo.md")
