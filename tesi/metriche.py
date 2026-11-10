@@ -11,11 +11,18 @@ P_SPOOF, C_MISS, C_FA = 0.05, 1, 10
 
 
 def tassi(label, punteggi):
-    """FRR e FAR per ogni soglia possibile (bonafide se il punteggio supera la soglia)."""
+    """
+    FRR e FAR per ogni soglia possibile (bonafide se il punteggio supera la soglia).
+    Le soglie stanno solo tra valori di punteggio diversi: le clip a pari merito finiscono
+    tutte dalla stessa parte. Prima si metteva una soglia tra ogni clip, e con i pareggi
+    (molti, perché i logit sono in bf16) il risultato dipendeva dall'ordine della lista.
+    """
     label, punteggi = np.asarray(label), np.asarray(punteggi, dtype=float)
-    bonafide = label[np.argsort(punteggi, kind="mergesort")] == 0
-    frr = np.concatenate([[0], np.cumsum(bonafide) / bonafide.sum()])
-    far = np.concatenate([[1], 1 - np.cumsum(~bonafide) / (~bonafide).sum()])
+    _, gruppo = np.unique(punteggi, return_inverse=True)   # indice del valore distinto, in ordine crescente
+    n_bona = np.bincount(gruppo, weights=label == 0)
+    n_spoof = np.bincount(gruppo, weights=label == 1)
+    frr = np.concatenate([[0], np.cumsum(n_bona) / n_bona.sum()])
+    far = np.concatenate([[1], 1 - np.cumsum(n_spoof) / n_spoof.sum()])
     return frr, far
 
 
