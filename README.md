@@ -27,6 +27,8 @@ classificatori_leggeri.py  classificatori di scikit-learn sulle feature SSL, sol
 crea_excel.py           raccoglie i risultati dei classificatori leggeri in un Excel
 risultati/              tabelle dei classificatori leggeri (copia di artifacts/classificatori_leggeri)
 manifests/              liste di file (CSV), committate per poter rifare gli esperimenti
+                        (le liste intere, cioè 2019 LA eval, 2021 LA/DF eval, ASVspoof 5 eval completo e train intero,
+                         non sono in git: si rifanno dai protocolli ufficiali con il notebook 01 o con prepara_lista() di coda_tabella3.py)
 data/                   dataset                         (non in git)
 artifacts/esperimenti/  pesi, log e punteggi di ogni esperimento   (non in git)
 ```

@@ -5,7 +5,7 @@ artifacts/
 Dataset_full/
 experiment/
 
-# manifests/ è INCLUSO nel repo per la riproducibilità — NON aggiungerlo qui
+# manifests/ è INCLUSO nel repo per la riproducibilità, tranne le liste intere qui sotto
 
 # Notebook
 .ipynb_checkpoints/
