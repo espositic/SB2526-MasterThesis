@@ -11,6 +11,8 @@ from transformers import AutoFeatureExtractor, AutoModel
 XLSR = "facebook/wav2vec2-xls-r-300m"
 WAVLM_BASE = "microsoft/wavlm-base"
 WAVLM_LARGE = "microsoft/wavlm-large"
+HUBERT_BASE = "facebook/hubert-base-ls960"   # usato solo congelato, nella baseline con classificatori leggeri
+HUBERT_LARGE = "facebook/hubert-large-ll60k"  # idem
 
 
 def carica_ssl(nome, congelato=False, checkpointing=True):
@@ -24,10 +26,11 @@ def carica_ssl(nome, congelato=False, checkpointing=True):
     ssl.config.mask_time_prob = 0.0
     ssl.config.mask_feature_prob = 0.0
     ssl.config.layerdrop = 0.0
-    ssl.freeze_feature_encoder()
     if congelato:
-        ssl.requires_grad_(False)
-    elif checkpointing:
+        ssl.requires_grad_(False)   # tutto congelato (HuBERT non ha freeze_feature_encoder)
+        return ssl, getattr(AutoFeatureExtractor.from_pretrained(nome), "do_normalize", True)
+    ssl.freeze_feature_encoder()
+    if checkpointing:
         ssl.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
     normalizza = getattr(AutoFeatureExtractor.from_pretrained(nome), "do_normalize", True)
     return ssl, normalizza
